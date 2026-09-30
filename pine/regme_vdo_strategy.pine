@@ -1,0 +1,119 @@
+//@version=6
+strategy("INV REGME + VDO Backtest", "REGME VDO Test", overlay = true, initial_capital = 10000, currency = currency.USD, pyramiding = 0, commission_type = strategy.commission.percent, commission_value = 0.0, slippage = 2, margin_long = 5, margin_short = 5, calc_on_every_tick = false, calc_on_order_fills = false, process_orders_on_close = false)
+
+// Test on closed chart bars. Orders fill on the next bar; no future data is used.
+
+groupMarket = "Market preset"
+marketPreset = input.string("Gold 1m", "Preset", options = ["Gold 1m", "Forex 1m", "Custom"], group = groupMarket)
+useSession = input.bool(true, "Use active session", group = groupMarket)
+customSession = input.session("0600-2000:12345", "Custom session (UTC)", group = groupMarket)
+
+if barstate.isfirst and timeframe.in_seconds() != 60
+    runtime.error("REGME VDO Test is designed for a 1-minute chart")
+
+groupRegme = "REGME"
+regmeLength = input.int(55, "REGME length", minval = 2, group = groupRegme)
+regmeSmooth = input.int(8, "REGME smoothing", minval = 1, group = groupRegme)
+slopeBars = input.int(3, "Slope lookback", minval = 1, group = groupRegme)
+
+groupVdo = "VDO"
+vdoLength = input.int(14, "VDO length", minval = 2, group = groupVdo)
+vdoSignalLength = input.int(8, "Signal length", minval = 1, group = groupVdo)
+vdoBandLength = input.int(50, "Dynamic band length", minval = 5, group = groupVdo)
+vdoBandMult = input.float(1.35, "Dynamic band width", minval = 0.1, step = 0.05, group = groupVdo)
+
+groupFilter = "Signal filters"
+volumeLength = input.int(34, "Tick-volume baseline", minval = 2, group = groupFilter)
+customVolumeMultiplier = input.float(1.30, "Custom volume multiplier", minval = 0.1, step = 0.05, group = groupFilter)
+atrLength = input.int(14, "ATR length", minval = 1, group = groupFilter)
+minRangeAtr = input.float(0.55, "Minimum candle range / ATR", minval = 0.0, step = 0.05, group = groupFilter)
+minBodyShare = input.float(0.25, "Minimum candle body share", minval = 0.0, maxval = 1.0, step = 0.05, group = groupFilter)
+
+groupRisk = "Risk management"
+riskPercent = input.float(1.0, "Risk per trade, %", minval = 0.1, maxval = 5.0, step = 0.1, group = groupRisk)
+customStopAtr = input.float(1.50, "Custom stop, ATR", minval = 0.2, step = 0.1, group = groupRisk)
+customRewardRisk = input.float(1.80, "Custom reward / risk", minval = 0.5, step = 0.1, group = groupRisk)
+customMaxBars = input.int(48, "Custom maximum bars", minval = 1, group = groupRisk)
+maxLeverage = input.float(20.0, "Maximum notional leverage", minval = 1.0, maxval = 100.0, step = 1.0, group = groupRisk)
+exitOnRegmeCross = input.bool(true, "Exit on REGME cross", group = groupRisk)
+
+bool goldPreset = marketPreset == "Gold 1m"
+bool forexPreset = marketPreset == "Forex 1m"
+float volumeMultiplier = goldPreset ? 1.35 : forexPreset ? 1.25 : customVolumeMultiplier
+float stopAtr = goldPreset ? 1.60 : forexPreset ? 1.30 : customStopAtr
+float rewardRisk = goldPreset ? 1.80 : forexPreset ? 1.60 : customRewardRisk
+int maxBarsInTrade = goldPreset ? 48 : forexPreset ? 40 : customMaxBars
+string activeSession = goldPreset ? "0700-2000:12345" : forexPreset ? "0600-1700:12345" : customSession
+bool sessionOk = not useSession or not na(time(timeframe.period, activeSession, "UTC"))
+
+float vol = nz(volume, 0.0)
+float volBase = ta.sma(vol, volumeLength)
+bool currentVolumeImpulse = volBase > 0 and vol > volBase * volumeMultiplier
+bool previousVolumeImpulse = volBase[1] > 0 and vol[1] > volBase[1] * volumeMultiplier
+bool volumeImpulse = currentVolumeImpulse or previousVolumeImpulse
+
+float atr = ta.atr(atrLength)
+float candleRange = high - low
+float bodyShare = candleRange > 0 ? math.abs(close - open) / candleRange : 0.0
+bool candleQuality = atr > 0 and candleRange >= atr * minRangeAtr and bodyShare >= minBodyShare
+
+float vwmaPrice = ta.vwma(hlc3, regmeLength)
+float regmeRaw = ta.ema(vwmaPrice, regmeSmooth)
+float regme = na(regmeRaw) ? ta.ema(hlc3, regmeSmooth) : regmeRaw
+bool bullRegime = close > regme and regme > regme[slopeBars]
+bool bearRegime = close < regme and regme < regme[slopeBars]
+
+float signedVolume = close > close[1] ? vol : close < close[1] ? -vol : 0.0
+float totalVolume = ta.ema(vol, vdoLength)
+float volumePosition = ta.ema(signedVolume, vdoLength)
+float vzo = totalVolume != 0.0 ? 100.0 * volumePosition / totalVolume : 0.0
+float vdo = math.max(0.0, math.min(100.0, 50.0 + vzo * 0.5))
+float vdoSignal = ta.ema(vdo, vdoSignalLength)
+float vdoDev = ta.stdev(vdo, vdoBandLength)
+float upperBand = math.min(80.0, vdoSignal + vdoDev * vdoBandMult)
+float lowerBand = math.max(20.0, vdoSignal - vdoDev * vdoBandMult)
+
+bool bullTurn = vdo[1] < lowerBand[1] and vdo > vdo[1] and vdo[1] <= vdo[2]
+bool bearTurn = vdo[1] > upperBand[1] and vdo < vdo[1] and vdo[1] >= vdo[2]
+bool enoughHistory = not na(regme[slopeBars]) and not na(lowerBand[2]) and not na(atr)
+bool longSignal = barstate.isconfirmed and enoughHistory and sessionOk and volumeImpulse and candleQuality and bullRegime and bullTurn
+bool shortSignal = barstate.isconfirmed and enoughHistory and sessionOk and volumeImpulse and candleQuality and bearRegime and bearTurn
+
+float stopDistance = atr * stopAtr
+float riskCash = strategy.equity * riskPercent * 0.01
+float pointValue = math.max(syminfo.pointvalue, 0.0000001)
+float riskQty = stopDistance > 0 ? riskCash / (stopDistance * pointValue) : 0.0
+float leverageQty = close > 0 ? strategy.equity * maxLeverage / (close * pointValue) : 0.0
+float orderQty = math.max(0.0, math.min(riskQty, leverageQty))
+int stopTicks = int(math.max(1.0, math.round(stopDistance / syminfo.mintick)))
+int targetTicks = int(math.max(1.0, math.round(stopTicks * rewardRisk)))
+
+if longSignal and strategy.position_size == 0 and orderQty > 0
+    strategy.entry("Long", strategy.long, qty = orderQty)
+    strategy.exit("Long bracket", "Long", loss = stopTicks, profit = targetTicks)
+
+if shortSignal and strategy.position_size == 0 and orderQty > 0
+    strategy.entry("Short", strategy.short, qty = orderQty)
+    strategy.exit("Short bracket", "Short", loss = stopTicks, profit = targetTicks)
+
+var int entryBar = na
+bool newPosition = strategy.position_size != 0 and strategy.position_size[1] == 0
+bool flatAfterPosition = strategy.position_size == 0 and strategy.position_size[1] != 0
+if newPosition
+    entryBar := bar_index
+if flatAfterPosition
+    entryBar := na
+
+bool timedExit = strategy.position_size != 0 and not na(entryBar) and bar_index - entryBar >= maxBarsInTrade
+if strategy.position_size > 0 and ((exitOnRegmeCross and close < regme) or timedExit)
+    strategy.close("Long", comment = timedExit ? "Time" : "REGME")
+if strategy.position_size < 0 and ((exitOnRegmeCross and close > regme) or timedExit)
+    strategy.close("Short", comment = timedExit ? "Time" : "REGME")
+
+color regmeColor = close >= regme ? color.rgb(22, 230, 120) : color.rgb(242, 76, 86)
+plot(regme, "REGME", color = regmeColor, linewidth = 3)
+plotshape(longSignal, "Long signal", shape.triangleup, location.belowbar, color.rgb(22, 230, 120), size = size.tiny)
+plotshape(shortSignal, "Short signal", shape.triangledown, location.abovebar, color.rgb(242, 76, 86), size = size.tiny)
+
+alertcondition(longSignal, "REGME VDO long", "REGME + VDO long on {{ticker}} {{interval}}")
+alertcondition(shortSignal, "REGME VDO short", "REGME + VDO short on {{ticker}} {{interval}}")

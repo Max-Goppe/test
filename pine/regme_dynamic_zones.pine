@@ -1,0 +1,101 @@
+//@version=6
+indicator("INV REGME Dynamic Zones", "REGME", overlay = true, max_boxes_count = 160, max_labels_count = 50, precision = 2)
+
+// Functional reconstruction from screenshots, not the private author's formula.
+
+groupRegme = "REGME"
+showRegme = input.bool(true, "Show REGME", group = groupRegme)
+regmeMode = input.string("VWMA + EMA", "Mean type", options = ["VWMA + EMA", "Session VWAP", "LinReg VWMA"], group = groupRegme)
+regmeLength = input.int(55, "REGME length", minval = 2, group = groupRegme)
+regmeSmooth = input.int(8, "REGME smoothing", minval = 1, group = groupRegme)
+regmeWidth = input.int(4, "REGME width", minval = 1, maxval = 8, group = groupRegme)
+
+groupImpulse = "Impulse filter"
+volumeLength = input.int(34, "Volume baseline", minval = 2, group = groupImpulse)
+volumeMultiplier = input.float(1.65, "Volume multiplier", minval = 0.1, step = 0.05, group = groupImpulse)
+atrLength = input.int(14, "ATR length", minval = 1, group = groupImpulse)
+minBodyAtr = input.float(0.35, "Min body / ATR", minval = 0.0, step = 0.05, group = groupImpulse)
+minRangeAtr = input.float(0.75, "Min range / ATR", minval = 0.0, step = 0.05, group = groupImpulse)
+
+groupZones = "Dynamic zones"
+showZones = input.bool(true, "Show dynamic zones", group = groupZones)
+maxZones = input.int(24, "Max zones per side", minval = 1, maxval = 70, group = groupZones)
+zoneExtendBars = input.int(250, "Zone projection bars", minval = 10, maxval = 500, group = groupZones)
+deleteBrokenZones = input.bool(false, "Delete broken zones", group = groupZones)
+zoneUseWicks = input.bool(true, "Use wick-to-body zones", group = groupZones)
+
+float vol = nz(volume, 0.0)
+float atr = ta.atr(atrLength)
+float volBase = ta.sma(vol, volumeLength)
+bool volumeImpulse = volBase > 0 and vol > volBase * volumeMultiplier
+float body = math.abs(close - open)
+float candleRange = high - low
+bool rangeImpulse = atr > 0 and body >= atr * minBodyAtr and candleRange >= atr * minRangeAtr
+
+float vwmaPrice = ta.vwma(hlc3, regmeLength)
+float regmeRaw = switch regmeMode
+    "Session VWAP" => ta.vwap(hlc3)
+    "LinReg VWMA" => ta.linreg(vwmaPrice, regmeSmooth, 0)
+    => ta.ema(vwmaPrice, regmeSmooth)
+float regme = na(regmeRaw) ? ta.ema(hlc3, regmeSmooth) : regmeRaw
+bool priceAboveRegme = close >= regme
+color regmeColor = priceAboveRegme ? color.rgb(22, 230, 120) : color.rgb(242, 76, 86)
+
+plot(showRegme ? regme : na, "REGME", color = regmeColor, linewidth = regmeWidth)
+
+bool bullishImpulse = showZones and volumeImpulse and rangeImpulse and close > open and close > regme
+bool bearishImpulse = showZones and volumeImpulse and rangeImpulse and close < open and close < regme
+
+var array<box> demandZones = array.new<box>()
+var array<box> supplyZones = array.new<box>()
+
+if bullishImpulse
+    float zTop = zoneUseWicks ? math.min(open, close) : math.max(open, close)
+    float zBottom = low
+    box zone = box.new(left = bar_index, top = zTop, right = bar_index + zoneExtendBars, bottom = zBottom, border_color = color.new(color.rgb(22, 230, 120), 35), bgcolor = color.new(color.rgb(22, 230, 120), 86), extend = extend.right)
+    array.push(demandZones, zone)
+    if array.size(demandZones) > maxZones
+        box.delete(array.shift(demandZones))
+
+if bearishImpulse
+    float zTop = high
+    float zBottom = zoneUseWicks ? math.max(open, close) : math.min(open, close)
+    box zone = box.new(left = bar_index, top = zTop, right = bar_index + zoneExtendBars, bottom = zBottom, border_color = color.new(color.rgb(242, 76, 86), 35), bgcolor = color.new(color.rgb(242, 76, 86), 86), extend = extend.right)
+    array.push(supplyZones, zone)
+    if array.size(supplyZones) > maxZones
+        box.delete(array.shift(supplyZones))
+
+if array.size(demandZones) > 0
+    for i = array.size(demandZones) - 1 to 0
+        box zone = array.get(demandZones, i)
+        float top = box.get_top(zone)
+        float bottom = box.get_bottom(zone)
+        bool broken = close < bottom
+        bool tested = low <= top and high >= bottom
+        if broken and deleteBrokenZones
+            box.delete(zone)
+            array.remove(demandZones, i)
+        else
+            box.set_right(zone, bar_index + zoneExtendBars)
+            box.set_extend(zone, broken ? extend.none : extend.right)
+            box.set_bgcolor(zone, broken ? color.new(color.gray, 92) : tested ? color.new(color.rgb(22, 230, 120), 79) : color.new(color.rgb(22, 230, 120), 87))
+            box.set_border_color(zone, broken ? color.new(color.gray, 70) : color.new(color.rgb(22, 230, 120), tested ? 15 : 45))
+
+if array.size(supplyZones) > 0
+    for i = array.size(supplyZones) - 1 to 0
+        box zone = array.get(supplyZones, i)
+        float top = box.get_top(zone)
+        float bottom = box.get_bottom(zone)
+        bool broken = close > top
+        bool tested = high >= bottom and low <= top
+        if broken and deleteBrokenZones
+            box.delete(zone)
+            array.remove(supplyZones, i)
+        else
+            box.set_right(zone, bar_index + zoneExtendBars)
+            box.set_extend(zone, broken ? extend.none : extend.right)
+            box.set_bgcolor(zone, broken ? color.new(color.gray, 92) : tested ? color.new(color.rgb(242, 76, 86), 79) : color.new(color.rgb(242, 76, 86), 87))
+            box.set_border_color(zone, broken ? color.new(color.gray, 70) : color.new(color.rgb(242, 76, 86), tested ? 15 : 45))
+
+alertcondition(bullishImpulse, "REGME bullish dynamic zone", "Bullish volume zone created on {{ticker}} {{interval}}")
+alertcondition(bearishImpulse, "REGME bearish dynamic zone", "Bearish volume zone created on {{ticker}} {{interval}}")
