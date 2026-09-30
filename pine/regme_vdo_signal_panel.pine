@@ -215,10 +215,10 @@ if buySignal or sellSignal
 const string kBuyText  = "BUY"
 const string kSellText = "SELL"
 
-buyFlag   = plotshape(signalStyle == "Flag"       and buySignal,  "BUY flag",   shape.flagup,     location.belowbar, bullColor, size = size.normal, text = kBuyText,  textcolor = bullColor)
-sellFlag  = plotshape(signalStyle == "Flag"       and sellSignal, "SELL flag",  shape.flagdown,   location.abovebar, bearColor, size = size.normal, text = kSellText, textcolor = bearColor)
-buyArrow  = plotshape(signalStyle == "Arrow"      and buySignal,  "BUY arrow",  shape.arrowup,    location.belowbar, bullColor, size = size.normal, text = kBuyText,  textcolor = bullColor)
-sellArrow = plotshape(signalStyle == "Arrow"      and sellSignal, "SELL arrow", shape.arrowdown,  location.abovebar, bearColor, size = size.normal, text = kSellText, textcolor = bearColor)
+buyFlag   = plotshape(signalStyle == "Flag"       and buySignal,  "BUY flag",   shape.flagup,     location.belowbar, bullColor, size = size.normal, text = "BUY",  textcolor = bullColor)
+sellFlag  = plotshape(signalStyle == "Flag"       and sellSignal, "SELL flag",  shape.flagdown,   location.abovebar, bearColor, size = size.normal, text = "SELL", textcolor = bearColor)
+buyArrow  = plotshape(signalStyle == "Arrow"      and buySignal,  "BUY arrow",  shape.arrowup,    location.belowbar, bullColor, size = size.normal, text = "BUY",  textcolor = bullColor)
+sellArrow = plotshape(signalStyle == "Arrow"      and sellSignal, "SELL arrow", shape.arrowdown,  location.abovebar, bearColor, size = size.normal, text = "SELL", textcolor = bearColor)
 buyChar   = plotchar(signalStyle == "Label only"  and buySignal,  "BUY char",   '▲',              location.belowbar, bullColor, size = size.normal)
 sellChar  = plotchar(signalStyle == "Label only"  and sellSignal, "SELL char",  '▼',              location.abovebar, bearColor, size = size.normal)
 
