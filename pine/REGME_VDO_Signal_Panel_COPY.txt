@@ -100,13 +100,11 @@ var array<float> demandBottoms = array.new<float>()
 var array<int>   demandBirth = array.new<int>()
 var array<bool>  demandTouched = array.new<bool>()
 var array<box>   demandBoxes = array.new<box>()
-var array<label> demandTouchLabels = array.new<label>()
 var array<float> supplyTops = array.new<float>()
 var array<float> supplyBottoms = array.new<float>()
 var array<int>   supplyBirth = array.new<int>()
 var array<bool>  supplyTouched = array.new<bool>()
 var array<box>   supplyBoxes = array.new<box>()
-var array<label> supplyTouchLabels = array.new<label>()
 
 if bullishImpulse
     float zTop = zoneUseWicks ? math.min(open, close) : math.max(open, close)
@@ -116,10 +114,8 @@ if bullishImpulse
     array.push(demandTouched, false)
     box dBoxNew = showZones ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 45), bgcolor = color.new(bullColor, 87), border_width = 1) : na
     array.push(demandBoxes, dBoxNew)
-    array.push(demandTouchLabels, na)
     if array.size(demandTops) > maxZones
         box.delete(array.shift(demandBoxes))
-        label.delete(array.shift(demandTouchLabels))
         array.shift(demandTops)
         array.shift(demandBottoms)
         array.shift(demandBirth)
@@ -133,18 +129,18 @@ if bearishImpulse
     array.push(supplyTouched, false)
     box sBoxNew = showZones ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 45), bgcolor = color.new(bearColor, 87), border_width = 1) : na
     array.push(supplyBoxes, sBoxNew)
-    array.push(supplyTouchLabels, na)
     if array.size(supplyTops) > maxZones
         box.delete(array.shift(supplyBoxes))
-        label.delete(array.shift(supplyTouchLabels))
         array.shift(supplyTops)
         array.shift(supplyBottoms)
         array.shift(supplyBirth)
         array.shift(supplyTouched)
 
-// First-touch tracking: each box/label is created ONCE at zone birth; later bars only update right edge / recolor.
+// First-touch tracking: boxes are created ONCE at zone birth; later bars only move the right edge / recolor.
 var int lastDemandTouchBar = 0
 var int lastSupplyTouchBar = 0
+bool touchDemandThisBar = false
+bool touchSupplyThisBar = false
 
 if array.size(demandTops) > 0
     for i = 0 to array.size(demandTops) - 1
@@ -157,20 +153,19 @@ if array.size(demandTops) > 0
         bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
         if tested and not wasTested
             lastDemandTouchBar := bar_index
+            touchDemandThisBar := true
         if tested
             array.set(demandTouched, i, true)
-        if showZones
-            box dB = array.get(demandBoxes, i)
-            if broken and not na(dB)
+        box dB = array.get(demandBoxes, i)
+        if showZones and not na(dB)
+            if broken
                 box.delete(dB)
                 array.set(demandBoxes, i, na)
-            else if not na(dB)
+            else
                 box.set_right(dB, bar_index + zoneExtendBars)
                 if tested
                     box.set_bgcolor(dB, color.new(bullColor, 79))
                     box.set_border_color(dB, color.new(bullColor, 15))
-            if inZone and bar_index > birth and not wasTested and not broken and na(array.get(demandTouchLabels, i))
-                array.set(demandTouchLabels, i, label.new(bar_index, bottom, "T", style = label.style_label_up, color = color.new(bullColor, 20), textcolor = color.black, size = size.tiny))
 
 if array.size(supplyTops) > 0
     for i = 0 to array.size(supplyTops) - 1
@@ -183,20 +178,19 @@ if array.size(supplyTops) > 0
         bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
         if tested and not wasTested
             lastSupplyTouchBar := bar_index
+            touchSupplyThisBar := true
         if tested
             array.set(supplyTouched, i, true)
-        if showZones
-            box sB = array.get(supplyBoxes, i)
-            if broken and not na(sB)
+        box sB = array.get(supplyBoxes, i)
+        if showZones and not na(sB)
+            if broken
                 box.delete(sB)
                 array.set(supplyBoxes, i, na)
-            else if not na(sB)
+            else
                 box.set_right(sB, bar_index + zoneExtendBars)
                 if tested
                     box.set_bgcolor(sB, color.new(bearColor, 79))
                     box.set_border_color(sB, color.new(bearColor, 15))
-            if inZone and bar_index > birth and not wasTested and not broken and na(array.get(supplyTouchLabels, i))
-                array.set(supplyTouchLabels, i, label.new(bar_index, top, "T", style = label.style_label_down, color = color.new(bearColor, 20), textcolor = color.black, size = size.tiny))
 
 // Fresh first-touch of an opposite-side zone within the lookback window.
 bool freshDemandTouch = lastDemandTouchBar > 0 and bar_index - lastDemandTouchBar <= touchLookback and priceAboveRegme
@@ -259,6 +253,9 @@ plotshape(buyArrow, "BUY arrow", shape.arrowup, location.belowbar, bullColor, si
 plotshape(sellArrow, "SELL arrow", shape.arrowdown, location.abovebar, bearColor, size = size.normal, text = "SELL", textcolor = bearColor)
 plotchar(buyChar, "BUY mark", "▲", location.belowbar, bullColor, size = size.small)
 plotchar(sellChar, "SELL mark", "▼", location.abovebar, bearColor, size = size.small)
+
+plotshape(touchDemandThisBar, "Demand first touch", shape.triangleup, location.belowbar, bullColor, size = size.tiny, text = "T", textcolor = bullColor)
+plotshape(touchSupplyThisBar, "Supply first touch", shape.triangledown, location.abovebar, bearColor, size = size.tiny, text = "T", textcolor = bearColor)
 
 // ────────────────────────── Status table ──────────────────────────
 cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
