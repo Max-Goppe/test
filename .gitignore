@@ -1,7 +1,1 @@
-# Compiled/Binary files
 __pycache__/
-*.pyc
-
-# System/Environment files
-.env
-.env.local
