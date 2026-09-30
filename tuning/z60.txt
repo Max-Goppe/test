@@ -1,0 +1,20 @@
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+### TF=60 bars=27758
+--- zones sweep ---
+(50, 2.2, 0.7, 0.75, 'VWMA+EMA', 55) {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.973), 'win05': np.float64(0.634)}
+(50, 2.2, 0.7, 1.0, 'VWMA+EMA', 55) {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.973), 'win05': np.float64(0.634)}
+(50, 2.2, 0.7, 0.75, 'LinRegVWMA', 55) {'cnt': 135, 'per_100bars': 0.486, 'avg': np.float64(0.961), 'win05': np.float64(0.63)}
+(50, 2.2, 0.7, 1.0, 'LinRegVWMA', 55) {'cnt': 135, 'per_100bars': 0.486, 'avg': np.float64(0.961), 'win05': np.float64(0.63)}
+(50, 2.2, 0.7, 0.75, 'VWMA+EMA', 100) {'cnt': 123, 'per_100bars': 0.443, 'avg': np.float64(0.956), 'win05': np.float64(0.626)}
+(50, 2.2, 0.7, 1.0, 'VWMA+EMA', 100) {'cnt': 123, 'per_100bars': 0.443, 'avg': np.float64(0.956), 'win05': np.float64(0.626)}
+(34, 2.2, 0.7, 1.0, 'VWMA+EMA', 55) {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.928), 'win05': np.float64(0.627)}
+(34, 2.2, 0.7, 1.0, 'VWMA+EMA', 100) {'cnt': 122, 'per_100bars': 0.44, 'avg': np.float64(0.926), 'win05': np.float64(0.623)}
+--- best zone cfg across horizons: (50, 2.2, 0.7, 0.75, 'VWMA+EMA', 55)
+Traceback (most recent call last):
+  File "/workspace/tuning/sim3.py", line 81, in <module>
+    s=zone_stats(d,*best,hz=hz); print(" hz",hz,{kk:(round(vv,3) if isinstance(vv,(float,np.floating)) else vv) for kk,vv in s.items()})
+      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/tuning/sim3.py", line 13, in zone_stats
+    if len(openD)>maxZones: openD.pop(0)
+       ^^^^^^^^^^^^^^^^^^^
+TypeError: '>' not supported between instances of 'int' and 'str'

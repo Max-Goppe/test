@@ -1,0 +1,34 @@
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+### TF=60 bars=8000
+--- zones sweep ---
+(34, 2.2, 0.7, 0.75, 'VWMA+EMA', 55) {'cnt': 121, 'per_100bars': 1.512, 'avg': 1.063, 'win05': 0.661}
+(34, 2.2, 0.7, 0.75, 'VWMA+EMA', 100) {'cnt': 111, 'per_100bars': 1.387, 'avg': 1.062, 'win05': 0.658}
+(20, 2.2, 0.7, 0.75, 'VWMA+EMA', 55) {'cnt': 123, 'per_100bars': 1.538, 'avg': 1.06, 'win05': 0.659}
+(20, 2.2, 0.7, 0.75, 'LinRegVWMA', 55) {'cnt': 123, 'per_100bars': 1.538, 'avg': 1.06, 'win05': 0.659}
+(20, 2.2, 0.7, 0.75, 'VWMA+EMA', 100) {'cnt': 113, 'per_100bars': 1.413, 'avg': 1.058, 'win05': 0.655}
+(50, 2.2, 0.7, 0.75, 'VWMA+EMA', 55) {'cnt': 121, 'per_100bars': 1.512, 'avg': 1.052, 'win05': 0.661}
+--- horizons for best: (34, 2.2, 0.7, 0.75, 'VWMA+EMA', 55)
+ hz 6 {'cnt': 121, 'per_100bars': 1.512, 'avg': 0.314, 'win05': 0.397}
+ hz 12 {'cnt': 121, 'per_100bars': 1.512, 'avg': 1.063, 'win05': 0.661}
+ hz 24 {'cnt': 121, 'per_100bars': 1.512, 'avg': 2.079, 'win05': 0.934}
+ hz 48 {'cnt': 121, 'per_100bars': 1.512, 'avg': 2.021, 'win05': 0.711}
+--- VDO confluence sweep ---
+('cross', 14, 1.35, True, 0.0) {'cnt': 386, 'per_100bars': 4.825, 'avg': 0.108, 'win05': 0.402}
+('cross', 14, 1.35, False, 0.0) {'cnt': 586, 'per_100bars': 7.325, 'avg': 0.084, 'win05': 0.394}
+('cross', 10, 1.35, True, 0.0) {'cnt': 556, 'per_100bars': 6.95, 'avg': 0.014, 'win05': 0.374}
+('cross', 10, 1.35, False, 0.0) {'cnt': 838, 'per_100bars': 10.475, 'avg': -0.011, 'win05': 0.384}
+('cross', 14, 1.0, False, 0.0) {'cnt': 1020, 'per_100bars': 12.75, 'avg': -0.017, 'win05': 0.383}
+('cross', 14, 1.0, True, 0.0) {'cnt': 577, 'per_100bars': 7.213, 'avg': -0.022, 'win05': 0.38}
+('cross', 10, 1.0, False, 0.0) {'cnt': 1322, 'per_100bars': 16.525, 'avg': -0.098, 'win05': 0.374}
+('breakout', 14, 1.35, True, 0.0) {'cnt': 326, 'per_100bars': 4.075, 'avg': -0.117, 'win05': 0.34}
+('cross', 20, 1.35, False, 0.0) {'cnt': 411, 'per_100bars': 5.138, 'avg': -0.119, 'win05': 0.363}
+('breakout', 10, 1.35, True, 0.0) {'cnt': 463, 'per_100bars': 5.787, 'avg': -0.122, 'win05': 0.326}
+('cross', 20, 1.35, True, 0.0) {'cnt': 262, 'per_100bars': 3.275, 'avg': -0.127, 'win05': 0.344}
+('cross', 10, 1.0, True, 0.0) {'cnt': 759, 'per_100bars': 9.488, 'avg': -0.136, 'win05': 0.36}
+('breakout', 14, 1.35, False, 0.0) {'cnt': 450, 'per_100bars': 5.625, 'avg': -0.147, 'win05': 0.322}
+('breakout', 10, 1.35, False, 0.0) {'cnt': 608, 'per_100bars': 7.6, 'avg': -0.149, 'win05': 0.322}
+--- horizons for best VDO cfg ---
+ hz 6 {'cnt': 386, 'per_100bars': 4.825, 'avg': -0.206, 'win05': 0.321}
+ hz 12 {'cnt': 386, 'per_100bars': 4.825, 'avg': 0.108, 'win05': 0.402}
+ hz 24 {'cnt': 386, 'per_100bars': 4.825, 'avg': 0.493, 'win05': 0.469}
+ hz 48 {'cnt': 386, 'per_100bars': 4.825, 'avg': 0.424, 'win05': 0.456}

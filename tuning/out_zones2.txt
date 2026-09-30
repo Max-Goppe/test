@@ -1,0 +1,37 @@
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+=== TF=15 bars=110342 ===
+plain    (50, 2.0, 0.7, 1.0) {'cnt': 502, 'per_bar': 0.005, 'avg': np.float64(0.353), 'win05': np.float64(0.396), 'med': np.float64(0.043)}
+plain    (50, 2.0, 0.7, 0.75) {'cnt': 509, 'per_bar': 0.005, 'avg': np.float64(0.337), 'win05': np.float64(0.393), 'med': np.float64(0.033)}
+plain    (50, 1.8, 0.7, 1.0) {'cnt': 934, 'per_bar': 0.008, 'avg': np.float64(0.327), 'win05': np.float64(0.421), 'med': np.float64(0.185)}
+plain    (50, 1.8, 0.7, 0.75) {'cnt': 951, 'per_bar': 0.009, 'avg': np.float64(0.327), 'win05': np.float64(0.419), 'med': np.float64(0.17)}
+plain    (50, 2.0, 0.35, 1.0) {'cnt': 609, 'per_bar': 0.006, 'avg': np.float64(0.303), 'win05': np.float64(0.391), 'med': np.float64(0.032)}
+plain    (50, 2.2, 0.7, 0.75) {'cnt': 315, 'per_bar': 0.003, 'avg': np.float64(0.302), 'win05': np.float64(0.387), 'med': np.float64(0.011)}
+plain    (50, 2.2, 0.7, 1.0) {'cnt': 312, 'per_bar': 0.003, 'avg': np.float64(0.302), 'win05': np.float64(0.388), 'med': np.float64(0.008)}
+plain    (50, 2.0, 0.35, 0.75) {'cnt': 660, 'per_bar': 0.006, 'avg': np.float64(0.295), 'win05': np.float64(0.392), 'med': np.float64(0.05)}
+plain    (50, 2.0, 0.5, 1.0) {'cnt': 559, 'per_bar': 0.005, 'avg': np.float64(0.282), 'win05': np.float64(0.388), 'med': np.float64(0.03)}
+plain    (50, 1.8, 0.5, 0.75) {'cnt': 1182, 'per_bar': 0.011, 'avg': np.float64(0.279), 'win05': np.float64(0.412), 'med': np.float64(0.136)}
+  hz 6 {'per_bar': 0.005, 'avg': np.float64(0.2), 'win05': np.float64(0.335), 'med': np.float64(0.088)} 502
+  hz 12 {'per_bar': 0.005, 'avg': np.float64(0.353), 'win05': np.float64(0.396), 'med': np.float64(0.043)} 502
+  hz 24 {'per_bar': 0.005, 'avg': np.float64(0.426), 'win05': np.float64(0.45), 'med': np.float64(0.185)} 502
+  hz 48 {'per_bar': 0.005, 'avg': np.float64(0.725), 'win05': np.float64(0.552), 'med': np.float64(0.821)} 502
+  maxZones 12 {'cnt': 502, 'per_bar': 0.005, 'avg': np.float64(0.353), 'win05': np.float64(0.396), 'med': np.float64(0.043)} 502 0.353 0.396
+  maxZones 24 {'cnt': 502, 'per_bar': 0.005, 'avg': np.float64(0.353), 'win05': np.float64(0.396), 'med': np.float64(0.043)} 502 0.353 0.396
+  maxZones 40 {'cnt': 502, 'per_bar': 0.005, 'avg': np.float64(0.353), 'win05': np.float64(0.396), 'med': np.float64(0.043)} 502 0.353 0.396
+=== TF=60 bars=27758 ===
+wickConf (50, 2.5, 0.7, 0.75) {'cnt': 129, 'per_bar': 0.005, 'avg': np.float64(0.994), 'win05': np.float64(0.636), 'med': np.float64(0.958)}
+wickConf (50, 2.5, 0.7, 1.0) {'cnt': 129, 'per_bar': 0.005, 'avg': np.float64(0.994), 'win05': np.float64(0.636), 'med': np.float64(0.958)}
+wickConf (50, 2.2, 0.7, 0.75) {'cnt': 137, 'per_bar': 0.005, 'avg': np.float64(0.967), 'win05': np.float64(0.628), 'med': np.float64(0.958)}
+wickConf (50, 2.2, 0.7, 1.0) {'cnt': 137, 'per_bar': 0.005, 'avg': np.float64(0.967), 'win05': np.float64(0.628), 'med': np.float64(0.958)}
+wickConf (34, 2.5, 0.7, 1.0) {'cnt': 130, 'per_bar': 0.005, 'avg': np.float64(0.947), 'win05': np.float64(0.623), 'med': np.float64(0.942)}
+wickConf (50, 2.5, 0.5, 1.0) {'cnt': 137, 'per_bar': 0.005, 'avg': np.float64(0.941), 'win05': np.float64(0.62), 'med': np.float64(0.926)}
+wickConf (34, 2.2, 0.7, 1.0) {'cnt': 137, 'per_bar': 0.005, 'avg': np.float64(0.923), 'win05': np.float64(0.62), 'med': np.float64(0.926)}
+wickConf (50, 2.5, 0.5, 0.75) {'cnt': 138, 'per_bar': 0.005, 'avg': np.float64(0.916), 'win05': np.float64(0.616), 'med': np.float64(0.921)}
+wickConf (34, 2.5, 0.7, 0.75) {'cnt': 131, 'per_bar': 0.005, 'avg': np.float64(0.914), 'win05': np.float64(0.618), 'med': np.float64(0.926)}
+wickConf (50, 2.2, 0.5, 1.0) {'cnt': 146, 'per_bar': 0.005, 'avg': np.float64(0.9), 'win05': np.float64(0.61), 'med': np.float64(0.9)}
+  hz 6 {'per_bar': 0.005, 'avg': np.float64(0.263), 'win05': np.float64(0.38), 'med': np.float64(0.242)} 129
+  hz 12 {'per_bar': 0.005, 'avg': np.float64(0.994), 'win05': np.float64(0.636), 'med': np.float64(0.958)} 129
+  hz 24 {'per_bar': 0.005, 'avg': np.float64(1.912), 'win05': np.float64(0.884), 'med': np.float64(1.969)} 129
+  hz 48 {'per_bar': 0.005, 'avg': np.float64(1.798), 'win05': np.float64(0.667), 'med': np.float64(1.881)} 129
+  maxZones 12 {'cnt': 129, 'per_bar': 0.005, 'avg': np.float64(0.994), 'win05': np.float64(0.636), 'med': np.float64(0.958)} 129 0.994 0.636
+  maxZones 24 {'cnt': 129, 'per_bar': 0.005, 'avg': np.float64(0.994), 'win05': np.float64(0.636), 'med': np.float64(0.958)} 129 0.994 0.636
+  maxZones 40 {'cnt': 129, 'per_bar': 0.005, 'avg': np.float64(0.994), 'win05': np.float64(0.636), 'med': np.float64(0.958)} 129 0.994 0.636

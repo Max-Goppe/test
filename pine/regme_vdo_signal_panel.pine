@@ -1,0 +1,247 @@
+//@version=6
+// This is a Pine Script v6 INDICATOR (not a strategy) - it only displays signals, no orders.
+indicator("INV REGME+VDO Signal Panel", "RVP SIGNAL", overlay = true, max_labels_count = 50, max_boxes_count = 160, precision = 2)
+
+// Combined signal engine for REGME + VDO, following the tuning conclusions from the MT5 GOLD M5 export:
+//  - best reaction on H1; zone-touch entries with trend; VDO band-breakout confirmation;
+//  - one merged script so you don't need request.security hacks across two private indicators.
+// Timeframe presets identical to regme_dynamic_zones.pine / vdo_volume_direction.pine.
+
+groupTf = "Timeframe preset"
+tfMode = input.string("Auto", "Preset", options = ["Auto", "M5", "M15", "H1"], group = groupTf,
+     tooltip = "Auto = picks settings by current chart timeframe. Recommended: H1.")
+
+bool isM5  = tfMode == "M5"  or (tfMode == "Auto" and timeframe.period == "5")
+bool isM15 = tfMode == "M15" or (tfMode == "Auto" and timeframe.period == "15")
+bool isH1  = tfMode == "H1"  or (tfMode == "Auto" and timeframe.period == "60")
+
+int   cfgRegmeLength   = isM15 ? 100 : 55
+float cfgVolumeMult    = isH1 ? 2.2 : isM15 ? 1.8 : 1.3
+float cfgMinBodyAtr    = isH1 ? 0.70 : isM15 ? 0.50 : 0.30
+float cfgMinRangeAtr   = isH1 ? 1.10 : isM15 ? 0.90 : 0.70
+int   cfgVolumeBaseLen = isH1 ? 50 : 34
+int   cfgVdoBandLength = isH1 ? 50 : 34
+float cfgVdoBandMult   = 1.35
+
+groupRegme = "REGME core"
+regmeMode = input.string("VWMA + EMA", "Mean type", options = ["VWMA + EMA", "Session VWAP", "LinReg VWMA"], group = groupRegme)
+regmeLength = input.int(0, "REGME length (0 = from preset)", minval = 0, group = groupRegme)
+regmeSmooth = input.int(8, "REGME smoothing", minval = 1, group = groupRegme)
+showRegmeLine = input.bool(true, "Show REGME line", group = groupRegme)
+
+groupImpulse = "Impulse filter"
+volumeLength = input.int(0, "Volume baseline (0 = from preset)", minval = 0, group = groupImpulse)
+volumeMultiplier = input.float(0.0, "Volume multiplier (0 = from preset)", minval = 0.0, step = 0.05, group = groupImpulse)
+atrLength = input.int(14, "ATR length", minval = 1, group = groupImpulse)
+minBodyAtr = input.float(0.0, "Min body / ATR (0 = from preset)", minval = 0.0, step = 0.05, group = groupImpulse)
+minRangeAtr = input.float(0.0, "Min range / ATR (0 = from preset)", minval = 0.0, step = 0.05, group = groupImpulse)
+
+groupZones = "Dynamic zones"
+showZones = input.bool(true, "Show dynamic zones", group = groupZones)
+maxZones = input.int(24, "Max zones per side", minval = 1, maxval = 75, group = groupZones)
+zoneExtendBars = input.int(250, "Zone projection bars", minval = 10, maxval = 500, group = groupZones)
+zoneUseWicks = input.bool(true, "Use wick-to-body zones", group = groupZones)
+
+groupVdo = "VDO oscillator"
+vdoLength = input.int(14, "VDO length", minval = 2, group = groupVdo)
+vdoSignalLength = input.int(8, "VDO signal length", minval = 1, group = groupVdo)
+vdoBandLength = input.int(0, "VDO band length (0 = from preset)", minval = 0, group = groupVdo)
+vdoBandMult = input.float(0.0, "VDO band width (0 = from preset)", minval = 0.0, step = 0.05, group = groupVdo)
+
+groupSignal = "Signal rules"
+minConfluence = input.int(2, "Min confluence score (2-3)", minval = 2, maxval = 3, group = groupSignal,
+     tooltip = "3 = strictest: requires fresh impulse AND first untouched-zone touch AND VDO breakout. 2 = allows one missing leg.")
+touchLookback = input.int(3, "Zone touch valid N bars", minval = 1, maxval = 10, group = groupSignal)
+breakoutLookback = input.int(3, "VDO breakout valid N bars", minval = 1, maxval = 10, group = groupSignal)
+impulseAgeMax = input.int(15, "Impulse zone age limit (bars)", minval = 3, maxval = 100, group = groupSignal)
+requireVdo = input.bool(true, "Require VDO confirmation", group = groupSignal)
+cooldownBars = input.int(10, "Signal cooldown bars", minval = 0, maxval = 100, group = groupSignal)
+
+groupVisuals = "Visuals"
+signalStyle = input.string("Flag", "Signal shape", options = ["Flag", "Arrow", "Label only"], group = groupVisuals)
+showTable = input.bool(true, "Show status table", group = groupVisuals)
+tableCorner = input.string("Top right", "Table position", options = ["Top left", "Top right", "Bottom left", "Bottom right"], group = groupVisuals)
+bullColor = input.color(color.rgb(22, 230, 120), "Buy color", group = groupVisuals)
+bearColor = input.color(color.rgb(242, 76, 86), "Sell color", group = groupVisuals)
+
+// Effective values: manual override if > 0, otherwise the timeframe preset.
+int   effRegmeLength   = regmeLength > 0 ? regmeLength : cfgRegmeLength
+int   effVolBaseLen    = volumeLength > 0 ? volumeLength : cfgVolumeBaseLen
+float effVolMult       = volumeMultiplier > 0 ? volumeMultiplier : cfgVolumeMult
+float effMinBodyAtr    = minBodyAtr > 0 ? minBodyAtr : cfgMinBodyAtr
+float effMinRangeAtr   = minRangeAtr > 0 ? minRangeAtr : cfgMinRangeAtr
+int   effVdoBandLength = vdoBandLength > 0 ? vdoBandLength : cfgVdoBandLength
+float effVdoBandMult   = vdoBandMult > 0 ? vdoBandMult : cfgVdoBandMult
+
+// ────────────────────────── Core calcs (same math as both source scripts) ──────────────────────────
+float vol = nz(volume, 0.0)
+float atr = ta.atr(atrLength)
+float volBase = ta.sma(vol, effVolBaseLen)
+bool volumeImpulse = volBase > 0 and vol > volBase * effVolMult
+float body = math.abs(close - open)
+float candleRange = high - low
+bool rangeImpulse = atr > 0 and body >= atr * effMinBodyAtr and candleRange >= atr * effMinRangeAtr
+
+float vwmaPrice = ta.vwma(hlc3, effRegmeLength)
+float regmeRaw = switch regmeMode
+    "Session VWAP" => ta.vwap(hlc3)
+    "LinReg VWMA" => ta.linreg(vwmaPrice, regmeSmooth, 0)
+    => ta.ema(vwmaPrice, regmeSmooth)
+float regme = na(regmeRaw) ? ta.ema(hlc3, regmeSmooth) : regmeRaw
+bool priceAboveRegme = close >= regme
+
+plot(showRegmeLine ? regme : na, "REGME", color = priceAboveRegme ? bullColor : bearColor, linewidth = 4)
+
+bool bullishImpulse = showZones and volumeImpulse and rangeImpulse and close > open and close > regme
+bool bearishImpulse = showZones and volumeImpulse and rangeImpulse and close < open and close < regme
+
+var array<float> demandTops = array.new<float>()
+var array<float> demandBottoms = array.new<float>()
+var array<int>   demandBirth = array.new<int>()
+var array<bool>  demandTouched = array.new<bool>()
+var array<float> supplyTops = array.new<float>()
+var array<float> supplyBottoms = array.new<float>()
+var array<int>   supplyBirth = array.new<int>()
+var array<bool>  supplyTouched = array.new<bool>()
+
+if bullishImpulse
+    float zTop = zoneUseWicks ? math.min(open, close) : math.max(open, close)
+    array.push(demandTops, zTop)
+    array.push(demandBottoms, low)
+    array.push(demandBirth, bar_index)
+    array.push(demandTouched, false)
+    if array.size(demandTops) > maxZones
+        array.shift(demandTops)
+        array.shift(demandBottoms)
+        array.shift(demandBirth)
+        array.shift(demandTouched)
+
+if bearishImpulse
+    float zBottom = zoneUseWicks ? math.max(open, close) : math.min(open, close)
+    array.push(supplyTops, high)
+    array.push(supplyBottoms, zBottom)
+    array.push(supplyBirth, bar_index)
+    array.push(supplyTouched, false)
+    if array.size(supplyTops) > maxZones
+        array.shift(supplyTops)
+        array.shift(supplyBottoms)
+        array.shift(supplyBirth)
+        array.shift(supplyTouched)
+
+// Zone rendering + first-touch tracking (mirrors regme_dynamic_zones.pine visuals).
+var int lastDemandTouchBar = 0
+var int lastSupplyTouchBar = 0
+
+if array.size(demandTops) > 0
+    for i = 0 to array.size(demandTops) - 1
+        float top = array.get(demandTops, i)
+        float bottom = array.get(demandBottoms, i)
+        int birth = array.get(demandBirth, i)
+        bool wasTested = array.get(demandTouched, i)
+        bool broken = close < bottom
+        bool inZone = low <= top and high >= bottom
+        bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
+        if tested and not wasTested
+            lastDemandTouchBar := bar_index
+        if tested
+            array.set(demandTouched, i, true)
+        if showZones and not broken
+            box.new(left = birth, top = top, right = bar_index + zoneExtendBars, bottom = bottom, extend = extend.right, border_color = color.new(bullColor, tested ? 15 : 45), bgcolor = color.new(bullColor, tested ? 79 : 87))
+
+if array.size(supplyTops) > 0
+    for i = 0 to array.size(supplyTops) - 1
+        float top = array.get(supplyTops, i)
+        float bottom = array.get(supplyBottoms, i)
+        int birth = array.get(supplyBirth, i)
+        bool wasTested = array.get(supplyTouched, i)
+        bool broken = close > top
+        bool inZone = high >= bottom and low <= top
+        bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
+        if tested and not wasTested
+            lastSupplyTouchBar := bar_index
+        if tested
+            array.set(supplyTouched, i, true)
+        if showZones and not broken
+            box.new(left = birth, top = top, right = bar_index + zoneExtendBars, bottom = bottom, extend = extend.right, border_color = color.new(bearColor, tested ? 15 : 45), bgcolor = color.new(bearColor, tested ? 79 : 87))
+
+// Fresh first-touch of an opposite-side zone within the lookback window.
+bool freshDemandTouch = lastDemandTouchBar > 0 and bar_index - lastDemandTouchBar <= touchLookback and priceAboveRegme
+bool freshSupplyTouch = lastSupplyTouchBar > 0 and bar_index - lastSupplyTouchBar <= touchLookback and not priceAboveRegme
+
+// Impulse freshness: a qualifying impulse happened recently and we are still on that side of REGME.
+// ta.barssince() must be called at global scope (not inside table blocks later).
+bool bullImpulseNow = bullishImpulse
+bool bearImpulseNow = bearishImpulse
+int bullImpulseAge = ta.barssince(bullImpulseNow)
+int bearImpulseAge = ta.barssince(bearImpulseNow)
+bool freshBullImpulse = not na(bullImpulseAge) and bullImpulseAge <= impulseAgeMax and priceAboveRegme
+bool freshBearImpulse = not na(bearImpulseAge) and bearImpulseAge <= impulseAgeMax and not priceAboveRegme
+
+// VDO oscillator + dynamic bands (mirrors vdo_volume_direction.pine).
+float signedVolume = close > close[1] ? vol : close < close[1] ? -vol : 0.0
+float totalVolume = ta.ema(vol, vdoLength)
+float volumePosition = ta.ema(signedVolume, vdoLength)
+float vzo = totalVolume != 0.0 ? 100.0 * volumePosition / totalVolume : 0.0
+float vdo = math.max(0.0, math.min(100.0, 50.0 + vzo * 0.5))
+float vdoSignalEma = ta.ema(vdo, vdoSignalLength)
+float vdoDev = ta.stdev(vdo, effVdoBandLength)
+float upperBand = math.min(80.0, vdoSignalEma + vdoDev * effVdoBandMult)
+float lowerBand = math.max(20.0, vdoSignalEma - vdoDev * effVdoBandMult)
+
+int vdoBullBars = ta.barssince(ta.crossover(vdo, upperBand))
+int vdoBearBars = ta.barssince(ta.crossunder(vdo, lowerBand))
+bool vdoBullBreakout = not na(vdoBullBars) and vdoBullBars <= breakoutLookback and vdo > vdoSignalEma
+bool vdoBearBreakout = not na(vdoBearBars) and vdoBearBars <= breakoutLookback and vdo < vdoSignalEma
+
+// ────────────────────────── Confluence scoring ──────────────────────────
+int bullScore = (freshBullImpulse ? 1 : 0) + (freshDemandTouch ? 1 : 0) + (not requireVdo or vdoBullBreakout ? 1 : 0)
+int bearScore = (freshBearImpulse ? 1 : 0) + (freshSupplyTouch ? 1 : 0) + (not requireVdo or vdoBearBreakout ? 1 : 0)
+
+var int lastSignalBar = 0
+bool inCooldown = lastSignalBar > 0 and bar_index - lastSignalBar <= cooldownBars
+
+bool rawBuy = priceAboveRegme and bullScore >= minConfluence
+bool rawSell = not priceAboveRegme and bearScore >= minConfluence
+
+bool buySignal = rawBuy and not inCooldown
+bool sellSignal = rawSell and not inCooldown
+
+if buySignal or sellSignal
+    lastSignalBar := bar_index
+
+// ────────────────────────── Visuals: flags / arrows / labels ──────────────────────────
+// NOTE: Pine has no "shape" keyword; the plotshape() shape argument is passed inline.
+// "Flag" mode uses flagup/flagdown; "Label only" hides the marker and prints text instead.
+string bullTxt = signalStyle == "Label only" ? "BUY" : signalStyle == "Flag" ? "" : ""
+string bearTxt = signalStyle == "Label only" ? "SELL" : signalStyle == "Flag" ? "" : ""
+
+plotshape(signalStyle != "Label only" and buySignal, "BUY signal", signalStyle == "Arrow" ? shape.arrowup : shape.flagup, location.belowbar, bullColor, size = size.normal, text = bullTxt, textcolor = bullColor)
+plotshape(signalStyle != "Label only" and sellSignal, "SELL signal", signalStyle == "Arrow" ? shape.arrowdown : shape.flagdown, location.abovebar, bearColor, size = size.normal, text = bearTxt, textcolor = bearColor)
+if buySignal
+    label.new(bar_index, signalStyle == "Label only" ? low : high, signalStyle == "Label only" ? "BUY" : "▲ BUY", style = label.style_label_up, color = color.new(bullColor, 15), textcolor = color.black, size = size.small)
+if sellSignal
+    label.new(bar_index, signalStyle == "Label only" ? high : low, signalStyle == "Label only" ? "SELL" : "▼ SELL", style = label.style_label_down, color = color.new(bearColor, 15), textcolor = color.black, size = size.small)
+
+// ────────────────────────── Status table ──────────────────────────
+cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
+var table panel = table.new(cornerPos, 2, 5, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
+
+string stateTxt = buySignal ? "BUY" : sellSignal ? "SELL" : priceAboveRegme ? "Bullish" : "Bearish"
+color stateCol = buySignal ? bullColor : sellSignal ? bearColor : priceAboveRegme ? color.new(bullColor, 40) : color.new(bearColor, 40)
+
+if showTable and barstate.islast
+    table.cell(panel, 0, 0, "STATE", text_color = stateCol, text_size = size.large)
+    table.cell(panel, 1, 0, stateTxt, text_color = stateCol, text_size = size.large)
+    table.cell(panel, 0, 1, "REGME side", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 1, priceAboveRegme ? "above (bull)" : "below (bear)", text_color = priceAboveRegme ? bullColor : bearColor, text_size = size.small)
+    table.cell(panel, 0, 2, "Fresh impulse", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 2, freshBullImpulse ? "bull #" + str.tostring(bullImpulseAge) : freshBearImpulse ? "bear #" + str.tostring(bearImpulseAge) : "none", text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 3, "Zone touch", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 3, freshDemandTouch ? "demand T" : freshSupplyTouch ? "supply T" : "none", text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 4, "VDO", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 4, str.tostring(vdo, "#.#") + (vdoBullBreakout ? "  ^break" : vdoBearBreakout ? "  vbreak" : ""), text_color = vdo >= vdoSignalEma ? bullColor : bearColor, text_size = size.small)
+
+// ────────────────────────── Alerts ──────────────────────────
+alertcondition(buySignal, "RVP BUY", "BUY signal {{ticker}} {{interval}} price {{close}}")
+alertcondition(sellSignal, "RVP SELL", "SELL signal {{ticker}} {{interval}} price {{close}}")
+alertcondition(buySignal or sellSignal, "RVP BUY or SELL", "Signal on {{ticker}} {{interval}}")
