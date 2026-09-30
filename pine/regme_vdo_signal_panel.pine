@@ -1,6 +1,6 @@
 //@version=6
 // This is a Pine Script v6 INDICATOR (not a strategy) - it only displays signals, no orders.
-indicator("INV REGME+VDO Signal Panel", "RVP SIGNAL", overlay = true, max_labels_count = 50, precision = 2)
+indicator("INV REGME+VDO Signal Panel", "RVP SIGNAL", overlay = true, max_labels_count = 50, max_boxes_count = 160, precision = 2)
 
 // Combined signal engine for REGME + VDO, following the tuning conclusions from the MT5 GOLD M5 export:
 //  - best reaction on H1; zone-touch entries with trend; VDO band-breakout confirmation;
@@ -129,8 +129,8 @@ if bearishImpulse
         array.shift(supplyTouched)
 
 // Zone rendering + first-touch tracking (mirrors regme_dynamic_zones.pine visuals).
-int lastDemandTouchBar = na
-int lastSupplyTouchBar = na
+var int lastDemandTouchBar = na
+var int lastSupplyTouchBar = na
 
 if array.size(demandTops) > 0
     for i = 0 to array.size(demandTops) - 1
@@ -169,8 +169,10 @@ bool freshDemandTouch = not na(lastDemandTouchBar) and bar_index - lastDemandTou
 bool freshSupplyTouch = not na(lastSupplyTouchBar) and bar_index - lastSupplyTouchBar <= touchLookback and not priceAboveRegme
 
 // Impulse freshness: a qualifying impulse happened recently and we are still on that side of REGME.
-bool freshBullImpulse = ta.barssince(bullishImpulse) <= impulseAgeMax and priceAboveRegme
-bool freshBearImpulse = ta.barssince(bearishImpulse) <= impulseAgeMax and not priceAboveRegme
+bool bullImpulseNow = bullishImpulse
+bool bearImpulseNow = bearishImpulse
+bool freshBullImpulse = ta.barssince(bullImpulseNow) <= impulseAgeMax and priceAboveRegme
+bool freshBearImpulse = ta.barssince(bearImpulseNow) <= impulseAgeMax and not priceAboveRegme
 
 // VDO oscillator + dynamic bands (mirrors vdo_volume_direction.pine).
 float signedVolume = close > close[1] ? vol : close < close[1] ? -vol : 0.0
@@ -210,10 +212,13 @@ string bearTxt = signalStyle == "Label only" ? "SELL" : ""
 
 plotshape(buySignal, "BUY signal", bullShape, location.belowbar, bullColor, size = size.normal, text = bullTxt, textcolor = bullColor)
 plotshape(sellSignal, "SELL signal", bearShape, location.abovebar, bearColor, size = size.normal, text = bearTxt, textcolor = bearColor)
-label.new(bar_index, buySignal ? low : sellSignal ? high : na, buySignal ? " BUY " : sellSignal ? " SELL " : "", style = label.style_none, textcolor = buySignal ? bullColor : sellSignal ? bearColor : color.white, size = size.small)
+if buySignal
+    label.new(bar_index, low, " BUY ", style = label.style_none, textcolor = bullColor, size = size.small)
+if sellSignal
+    label.new(bar_index, high, " SELL ", style = label.style_none, textcolor = bearColor, size = size.small)
 
 // ────────────────────────── Status table ──────────────────────────
-position_t cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
+cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
 var table panel = table.new(cornerPos, 2, 5, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
 
 string stateTxt = buySignal ? "BUY" : sellSignal ? "SELL" : priceAboveRegme ? "Bullish" : "Bearish"
@@ -225,7 +230,7 @@ if showTable and barstate.islast
     table.cell(panel, 0, 1, "REGME side", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 1, priceAboveRegme ? "above (bull)" : "below (bear)", text_color = priceAboveRegme ? bullColor : bearColor, text_size = size.small)
     table.cell(panel, 0, 2, "Fresh impulse", text_color = color.silver, text_size = size.small)
-    table.cell(panel, 1, 2, freshBullImpulse ? "bull #" + str.tostring(ta.barssince(bullishImpulse)) : freshBearImpulse ? "bear #" + str.tostring(ta.barssince(bearishImpulse)) : "none", text_color = color.white, text_size = size.small)
+    table.cell(panel, 1, 2, freshBullImpulse ? "bull #" + str.tostring(ta.barssince(bullImpulseNow)) : freshBearImpulse ? "bear #" + str.tostring(ta.barssince(bearImpulseNow)) : "none", text_color = color.white, text_size = size.small)
     table.cell(panel, 0, 3, "Zone touch", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 3, freshDemandTouch ? "demand T" : freshSupplyTouch ? "supply T" : "none", text_color = color.white, text_size = size.small)
     table.cell(panel, 0, 4, "VDO", text_color = color.silver, text_size = size.small)
