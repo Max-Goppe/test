@@ -230,9 +230,9 @@ if buySignal or sellSignal
     lastSignalBar := bar_index
 
 // ────────────────────────── Visuals: flags / arrows / labels ──────────────────────────
-// No plotshape()/plotchar() at all: their shape/text/size arguments must be const,
-// which conflicts with the "Signal shape" input. Instead every signal draws a
-// regular label (label.new accepts series args freely), styled as flag/arrow/text.
+
+
+
 if buySignal
     if signalStyle == "Flag"
         label.new(bar_index, low, "🏳 BUY", style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
