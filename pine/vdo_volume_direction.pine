@@ -2,33 +2,61 @@
 indicator("INV VDO Volume Direction", "VDO", overlay = false, precision = 1)
 
 // Functional reconstruction from screenshots, not the private author's formula.
-// VDO is based on Volume Zone Oscillator logic: signed volume / total volume.
+// Timeframe presets tuned on MT5 GOLD M5 export (2022-2026): mean-reversion signals are
+// unprofitable; the positive edge comes from "band breakout with trend" confirmed by REGME side (H1).
+
+groupTf = "Timeframe preset"
+tfMode = input.string("Auto", "Preset", options = ["Auto", "M5", "M15", "H1"], group = groupTf,
+     tooltip = "Auto = picks settings by current chart timeframe. H1: VDO 14, bands 50 x1.35, mode 'Band breakout + REGME'. M15/M5: keep default length but breakout mode still preferred.")
+
+bool isM5  = tfMode == "M5"  or (tfMode == "Auto" and timeframe.period == "5")
+bool isM15 = tfMode == "M15" or (tfMode == "Auto" and timeframe.period == "15")
+bool isH1  = tfMode == "H1"  or (tfMode == "Auto" and timeframe.period == "60")
+
+int   cfgRegmeLength    = isM15 ? 100 : 55
+float cfgVolumeMult     = isH1 ? 2.2 : isM15 ? 1.8 : 1.3
+int   cfgVolumeBaseLen  = isH1 ? 50 : 34
+int   cfgVdoLength      = 14
+int   cfgVdoBandLength  = isH1 ? 50 : 34
+float cfgVdoBandMult    = 1.35
+string cfgSignalMode    = isH1 ? "Band breakout + REGME" : isM15 ? "Band breakout + REGME" : "Band breakout only"
 
 groupRegmeFilter = "REGME filter"
 useRegmeFilter = input.bool(true, "Filter by REGME side", group = groupRegmeFilter)
 regmeMode = input.string("VWMA + EMA", "Mean type", options = ["VWMA + EMA", "Session VWAP", "LinReg VWMA"], group = groupRegmeFilter)
-regmeLength = input.int(55, "REGME length", minval = 2, group = groupRegmeFilter)
+regmeLength = input.int(0, "REGME length (0 = from preset)", minval = 0, group = groupRegmeFilter)
 regmeSmooth = input.int(8, "REGME smoothing", minval = 1, group = groupRegmeFilter)
 
 groupImpulse = "Impulse filter"
 requireImpulse = input.bool(true, "Require volume impulse", group = groupImpulse)
-volumeLength = input.int(34, "Volume baseline", minval = 2, group = groupImpulse)
-volumeMultiplier = input.float(1.65, "Volume multiplier", minval = 0.1, step = 0.05, group = groupImpulse)
+volumeLength = input.int(0, "Volume baseline (0 = from preset)", minval = 0, group = groupImpulse)
+volumeMultiplier = input.float(0.0, "Volume multiplier (0 = from preset)", minval = 0.0, step = 0.05, group = groupImpulse)
 
 groupVdo = "VDO"
-vdoLength = input.int(14, "VDO length", minval = 2, group = groupVdo)
+vdoLength = input.int(0, "VDO length (0 = from preset)", minval = 0, group = groupVdo)
 vdoSignalLength = input.int(8, "Signal length", minval = 1, group = groupVdo)
-vdoBandLength = input.int(50, "Dynamic band length", minval = 5, group = groupVdo)
-vdoBandMult = input.float(1.35, "Dynamic band width", minval = 0.1, step = 0.05, group = groupVdo)
+vdoBandLength = input.int(0, "Dynamic band length (0 = from preset)", minval = 0, group = groupVdo)
+vdoBandMult = input.float(0.0, "Dynamic band width (0 = from preset)", minval = 0.0, step = 0.05, group = groupVdo)
+signalMode = input.string("", "Signal mode (empty = from preset)", options = ["", "Band breakout + REGME", "Band breakout only", "Reversal from zone (legacy)"], group = groupVdo,
+     tooltip = "Breakout modes: enter when VDO closes through the dynamic band in the direction of price vs REGME. Legacy reversal mode was negative-expectancy on the GOLD data set.")
 showSignalBands = input.bool(true, "Show 20/80 signal zones", group = groupVdo)
 showEarlySignals = input.bool(true, "Show early 20/80 arrows", group = groupVdo)
 showPressureBackground = input.bool(true, "Show pressure background", group = groupVdo)
 
-float vol = nz(volume, 0.0)
-float volBase = ta.sma(vol, volumeLength)
-bool volumeImpulse = volBase > 0 and vol > volBase * volumeMultiplier
+// Effective values: manual override if > 0 / non-empty, otherwise the timeframe preset.
+int    effRegmeLength   = regmeLength > 0 ? regmeLength : cfgRegmeLength
+int    effVolBaseLen    = volumeLength > 0 ? volumeLength : cfgVolumeBaseLen
+float  effVolMult       = volumeMultiplier > 0 ? volumeMultiplier : cfgVolumeMult
+int    effVdoLength     = vdoLength > 0 ? vdoLength : cfgVdoLength
+int    effVdoBandLength = vdoBandLength > 0 ? vdoBandLength : cfgVdoBandLength
+float  effVdoBandMult   = vdoBandMult > 0 ? vdoBandMult : cfgVdoBandMult
+string effSignalMode    = signalMode != "" ? signalMode : cfgSignalMode
 
-float vwmaPrice = ta.vwma(hlc3, regmeLength)
+float vol = nz(volume, 0.0)
+float volBase = ta.sma(vol, effVolBaseLen)
+bool volumeImpulse = volBase > 0 and vol > volBase * effVolMult
+
+float vwmaPrice = ta.vwma(hlc3, effRegmeLength)
 float regmeRaw = switch regmeMode
     "Session VWAP" => ta.vwap(hlc3)
     "LinReg VWMA" => ta.linreg(vwmaPrice, regmeSmooth, 0)
@@ -36,22 +64,36 @@ float regmeRaw = switch regmeMode
 float regme = na(regmeRaw) ? ta.ema(hlc3, regmeSmooth) : regmeRaw
 
 float signedVolume = close > close[1] ? vol : close < close[1] ? -vol : 0.0
-float totalVolume = ta.ema(vol, vdoLength)
-float volumePosition = ta.ema(signedVolume, vdoLength)
+float totalVolume = ta.ema(vol, effVdoLength)
+float volumePosition = ta.ema(signedVolume, effVdoLength)
 float vzo = totalVolume != 0.0 ? 100.0 * volumePosition / totalVolume : 0.0
 float vdo = math.max(0.0, math.min(100.0, 50.0 + vzo * 0.5))
 float vdoSignal = ta.ema(vdo, vdoSignalLength)
-float vdoDev = ta.stdev(vdo, vdoBandLength)
-float upperBand = math.min(80.0, vdoSignal + vdoDev * vdoBandMult)
-float lowerBand = math.max(20.0, vdoSignal - vdoDev * vdoBandMult)
+float vdoDev = ta.stdev(vdo, effVdoBandLength)
+float upperBand = math.min(80.0, vdoSignal + vdoDev * effVdoBandMult)
+float lowerBand = math.max(20.0, vdoSignal - vdoDev * effVdoBandMult)
 
 bool signalVolumeOk = not requireImpulse or volumeImpulse
 bool bullRegmeOk = not useRegmeFilter or close > regme
 bool bearRegmeOk = not useRegmeFilter or close < regme
+
+// Legacy mean-reversion turns (kept as an option, negative expectancy on this data set).
 bool bullTurnFromZone = vdo[1] < lowerBand[1] and vdo > vdo[1] and vdo[1] <= vdo[2]
 bool bearTurnFromZone = vdo[1] > upperBand[1] and vdo < vdo[1] and vdo[1] >= vdo[2]
-bool bullSignal = signalVolumeOk and bullRegmeOk and bullTurnFromZone
-bool bearSignal = signalVolumeOk and bearRegmeOk and bearTurnFromZone
+
+// Band-breakout-with-trend: VDO pushes through the dynamic band while price is on that side of REGME.
+bool bullBreakout = ta.crossover(vdo, upperBand) and volumeImpulse
+bool bearBreakout = ta.crossunder(vdo, lowerBand) and volumeImpulse
+
+bool bullSignal = switch effSignalMode
+    "Band breakout + REGME" => bullBreakout and bullRegmeOk
+    "Band breakout only"    => bullBreakout
+    => signalVolumeOk and bullRegmeOk and bullTurnFromZone
+bool bearSignal = switch effSignalMode
+    "Band breakout + REGME" => bearBreakout and bearRegmeOk
+    "Band breakout only"    => bearBreakout
+    => signalVolumeOk and bearRegmeOk and bearTurnFromZone
+
 bool bullEarly = showEarlySignals and signalVolumeOk and ta.crossover(vdo, 20)
 bool bearEarly = showEarlySignals and signalVolumeOk and ta.crossunder(vdo, 80)
 bool bullPressure = showPressureBackground and (vdo < lowerBand or vdo < 35)

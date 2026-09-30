@@ -2,20 +2,35 @@
 indicator("INV REGME Dynamic Zones", "REGME", overlay = true, max_boxes_count = 160, max_labels_count = 50, precision = 2)
 
 // Functional reconstruction from screenshots, not the private author's formula.
+// Timeframe presets tuned on MT5 GOLD M5 export (2022-2026): best zone-touch reaction on H1.
+
+groupTf = "Timeframe preset"
+tfMode = input.string("Auto", "Preset", options = ["Auto", "M5", "M15", "H1"], group = groupTf,
+     tooltip = "Auto = picks settings by current chart timeframe. H1: vol x2.2, VWMA+EMA 55/8, body>=0.7 ATR (best touch reaction). M15: vol x1.8, VWMA+EMA 100/8. M5: relaxed filter, signals are weak.")
+
+bool isM5  = tfMode == "M5"  or (tfMode == "Auto" and timeframe.period == "5")
+bool isM15 = tfMode == "M15" or (tfMode == "Auto" and timeframe.period == "15")
+bool isH1  = tfMode == "H1"  or (tfMode == "Auto" and timeframe.period == "60")
+
+int   cfgRegmeLength   = isM15 ? 100 : 55
+float cfgVolumeMult    = isH1 ? 2.2 : isM15 ? 1.8 : 1.3
+float cfgMinBodyAtr    = isH1 ? 0.70 : isM15 ? 0.50 : 0.30
+float cfgMinRangeAtr   = isH1 ? 1.10 : isM15 ? 0.90 : 0.70
+int   cfgVolumeBaseLen = isH1 ? 50 : 34
 
 groupRegme = "REGME"
 showRegme = input.bool(true, "Show REGME", group = groupRegme)
 regmeMode = input.string("VWMA + EMA", "Mean type", options = ["VWMA + EMA", "Session VWAP", "LinReg VWMA"], group = groupRegme)
-regmeLength = input.int(55, "REGME length", minval = 2, group = groupRegme)
+regmeLength = input.int(0, "REGME length (0 = from preset)", minval = 0, group = groupRegme)
 regmeSmooth = input.int(8, "REGME smoothing", minval = 1, group = groupRegme)
 regmeWidth = input.int(4, "REGME width", minval = 1, maxval = 8, group = groupRegme)
 
 groupImpulse = "Impulse filter"
-volumeLength = input.int(34, "Volume baseline", minval = 2, group = groupImpulse)
-volumeMultiplier = input.float(1.65, "Volume multiplier", minval = 0.1, step = 0.05, group = groupImpulse)
+volumeLength = input.int(0, "Volume baseline (0 = from preset)", minval = 0, group = groupImpulse)
+volumeMultiplier = input.float(0.0, "Volume multiplier (0 = from preset)", minval = 0.0, step = 0.05, group = groupImpulse)
 atrLength = input.int(14, "ATR length", minval = 1, group = groupImpulse)
-minBodyAtr = input.float(0.35, "Min body / ATR", minval = 0.0, step = 0.05, group = groupImpulse)
-minRangeAtr = input.float(0.75, "Min range / ATR", minval = 0.0, step = 0.05, group = groupImpulse)
+minBodyAtr = input.float(0.0, "Min body / ATR (0 = from preset)", minval = 0.0, step = 0.05, group = groupImpulse)
+minRangeAtr = input.float(0.0, "Min range / ATR (0 = from preset)", minval = 0.0, step = 0.05, group = groupImpulse)
 
 groupZones = "Dynamic zones"
 showZones = input.bool(true, "Show dynamic zones", group = groupZones)
@@ -23,16 +38,24 @@ maxZones = input.int(24, "Max zones per side", minval = 1, maxval = 70, group = 
 zoneExtendBars = input.int(250, "Zone projection bars", minval = 10, maxval = 500, group = groupZones)
 deleteBrokenZones = input.bool(false, "Delete broken zones", group = groupZones)
 zoneUseWicks = input.bool(true, "Use wick-to-body zones", group = groupZones)
+markOnTouch = input.bool(true, "Mark first touch of a zone", group = groupZones)
+
+// Effective values: manual override if > 0, otherwise the timeframe preset.
+int   effRegmeLength = regmeLength > 0 ? regmeLength : cfgRegmeLength
+int   effVolBaseLen  = volumeLength > 0 ? volumeLength : cfgVolumeBaseLen
+float effVolMult     = volumeMultiplier > 0 ? volumeMultiplier : cfgVolumeMult
+float effMinBodyAtr  = minBodyAtr > 0 ? minBodyAtr : cfgMinBodyAtr
+float effMinRangeAtr = minRangeAtr > 0 ? minRangeAtr : cfgMinRangeAtr
 
 float vol = nz(volume, 0.0)
 float atr = ta.atr(atrLength)
-float volBase = ta.sma(vol, volumeLength)
-bool volumeImpulse = volBase > 0 and vol > volBase * volumeMultiplier
+float volBase = ta.sma(vol, effVolBaseLen)
+bool volumeImpulse = volBase > 0 and vol > volBase * effVolMult
 float body = math.abs(close - open)
 float candleRange = high - low
-bool rangeImpulse = atr > 0 and body >= atr * minBodyAtr and candleRange >= atr * minRangeAtr
+bool rangeImpulse = atr > 0 and body >= atr * effMinBodyAtr and candleRange >= atr * effMinRangeAtr
 
-float vwmaPrice = ta.vwma(hlc3, regmeLength)
+float vwmaPrice = ta.vwma(hlc3, effRegmeLength)
 float regmeRaw = switch regmeMode
     "Session VWAP" => ta.vwap(hlc3)
     "LinReg VWMA" => ta.linreg(vwmaPrice, regmeSmooth, 0)
@@ -46,24 +69,33 @@ plot(showRegme ? regme : na, "REGME", color = regmeColor, linewidth = regmeWidth
 bool bullishImpulse = showZones and volumeImpulse and rangeImpulse and close > open and close > regme
 bool bearishImpulse = showZones and volumeImpulse and rangeImpulse and close < open and close < regme
 
-var array<box> demandZones = array.new<box>()
-var array<box> supplyZones = array.new<box>()
+var array<box>   demandZones = array.new<box>()
+var array<bool>  demandTouched = array.new<bool>()
+var array<box>   supplyZones = array.new<box>()
+var array<bool>  supplyTouched = array.new<bool>()
+
+bool firstTouchDemand = false
+bool firstTouchSupply = false
 
 if bullishImpulse
     float zTop = zoneUseWicks ? math.min(open, close) : math.max(open, close)
     float zBottom = low
     box zone = box.new(left = bar_index, top = zTop, right = bar_index + zoneExtendBars, bottom = zBottom, border_color = color.new(color.rgb(22, 230, 120), 35), bgcolor = color.new(color.rgb(22, 230, 120), 86), extend = extend.right)
     array.push(demandZones, zone)
+    array.push(demandTouched, false)
     if array.size(demandZones) > maxZones
         box.delete(array.shift(demandZones))
+        array.shift(demandTouched)
 
 if bearishImpulse
     float zTop = high
     float zBottom = zoneUseWicks ? math.max(open, close) : math.min(open, close)
     box zone = box.new(left = bar_index, top = zTop, right = bar_index + zoneExtendBars, bottom = zBottom, border_color = color.new(color.rgb(242, 76, 86), 35), bgcolor = color.new(color.rgb(242, 76, 86), 86), extend = extend.right)
     array.push(supplyZones, zone)
+    array.push(supplyTouched, false)
     if array.size(supplyZones) > maxZones
         box.delete(array.shift(supplyZones))
+        array.shift(supplyTouched)
 
 if array.size(demandZones) > 0
     for i = array.size(demandZones) - 1 to 0
@@ -71,10 +103,19 @@ if array.size(demandZones) > 0
         float top = box.get_top(zone)
         float bottom = box.get_bottom(zone)
         bool broken = close < bottom
-        bool tested = low <= top and high >= bottom
+        bool wasTested = array.get(demandTouched, i)
+        bool inZone = low <= top and high >= bottom
+        // Skip the creation bar itself: touch must happen after the zone is formed.
+        bool tested = broken or wasTested ? wasTested : inZone and ta.barssince(bullishImpulse) > 0
+        if markOnTouch and tested and not wasTested
+            firstTouchDemand := true
+            label.new(bar_index, bottom, "T", style = label.style_label_up, color = color.new(color.rgb(22, 230, 120), 0), textcolor = color.black, size = size.tiny)
+        if tested
+            array.set(demandTouched, i, true)
         if broken and deleteBrokenZones
             box.delete(zone)
             array.remove(demandZones, i)
+            array.remove(demandTouched, i)
         else
             box.set_right(zone, bar_index + zoneExtendBars)
             box.set_extend(zone, broken ? extend.none : extend.right)
@@ -87,15 +128,28 @@ if array.size(supplyZones) > 0
         float top = box.get_top(zone)
         float bottom = box.get_bottom(zone)
         bool broken = close > top
-        bool tested = high >= bottom and low <= top
+        bool wasTested = array.get(supplyTouched, i)
+        bool inZone = high >= bottom and low <= top
+        bool tested = broken or wasTested ? wasTested : inZone and ta.barssince(bearishImpulse) > 0
+        if markOnTouch and tested and not wasTested
+            firstTouchSupply := true
+            label.new(bar_index, top, "T", style = label.style_label_down, color = color.new(color.rgb(242, 76, 86), 0), textcolor = color.black, size = size.tiny)
+        if tested
+            array.set(supplyTouched, i, true)
         if broken and deleteBrokenZones
             box.delete(zone)
             array.remove(supplyZones, i)
+            array.remove(supplyTouched, i)
         else
             box.set_right(zone, bar_index + zoneExtendBars)
             box.set_extend(zone, broken ? extend.none : extend.right)
             box.set_bgcolor(zone, broken ? color.new(color.gray, 92) : tested ? color.new(color.rgb(242, 76, 86), 79) : color.new(color.rgb(242, 76, 86), 87))
             box.set_border_color(zone, broken ? color.new(color.gray, 70) : color.new(color.rgb(242, 76, 86), tested ? 15 : 45))
 
+plotshape(markOnTouch and firstTouchDemand, "Demand zone first touch", shape.triangleup, location.belowbar, color.rgb(22, 230, 120), size = size.tiny)
+plotshape(markOnTouch and firstTouchSupply, "Supply zone first touch", shape.triangledown, location.abovebar, color.rgb(242, 76, 86), size = size.tiny)
+
 alertcondition(bullishImpulse, "REGME bullish dynamic zone", "Bullish volume zone created on {{ticker}} {{interval}}")
 alertcondition(bearishImpulse, "REGME bearish dynamic zone", "Bearish volume zone created on {{ticker}} {{interval}}")
+alertcondition(firstTouchDemand, "Demand zone touched", "First touch of demand zone on {{ticker}} {{interval}}")
+alertcondition(firstTouchSupply, "Supply zone touched", "First touch of supply zone on {{ticker}} {{interval}}")

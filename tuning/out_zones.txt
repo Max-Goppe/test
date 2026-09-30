@@ -1,0 +1,23 @@
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+=== TF=5 bars=330578 ===
+wickConf (34, 2.0, 0.7, 0.75) {'cnt': 1575, 'per_bar': 0.005, 'avg': np.float64(0.072), 'win05': np.float64(0.391), 'med': np.float64(0.026)}
+wickConf (34, 2.0, 0.35, 0.75) {'cnt': 2184, 'per_bar': 0.007, 'avg': np.float64(0.068), 'win05': np.float64(0.391), 'med': np.float64(-0.004)}
+wickConf (34, 2.0, 0.7, 1.0) {'cnt': 1541, 'per_bar': 0.005, 'avg': np.float64(0.063), 'win05': np.float64(0.391), 'med': np.float64(0.017)}
+wickConf (34, 2.0, 0.35, 1.0) {'cnt': 2020, 'per_bar': 0.006, 'avg': np.float64(0.061), 'win05': np.float64(0.395), 'med': np.float64(0.011)}
+wickConf (34, 2.2, 0.35, 0.75) {'cnt': 1422, 'per_bar': 0.004, 'avg': np.float64(0.049), 'win05': np.float64(0.378), 'med': np.float64(-0.022)}
+wickConf (50, 2.2, 0.35, 1.0) {'cnt': 1223, 'per_bar': 0.004, 'avg': np.float64(0.044), 'win05': np.float64(0.367), 'med': np.float64(-0.043)}
+wickConf (50, 2.2, 0.35, 0.75) {'cnt': 1317, 'per_bar': 0.004, 'avg': np.float64(0.042), 'win05': np.float64(0.365), 'med': np.float64(-0.037)}
+wickConf (34, 2.2, 0.35, 1.0) {'cnt': 1344, 'per_bar': 0.004, 'avg': np.float64(0.037), 'win05': np.float64(0.377), 'med': np.float64(-0.022)}
+wickConf (34, 2.0, 0.5, 0.75) {'cnt': 1907, 'per_bar': 0.006, 'avg': np.float64(0.036), 'win05': np.float64(0.388), 'med': np.float64(0.004)}
+wickConf (34, 2.0, 0.5, 1.0) {'cnt': 1812, 'per_bar': 0.005, 'avg': np.float64(0.036), 'win05': np.float64(0.391), 'med': np.float64(0.016)}
+  hz 6 {'per_bar': 0.005, 'avg': np.float64(0.011), 'win05': np.float64(0.342), 'med': np.float64(-0.029)} 1575
+  hz 12 {'per_bar': 0.005, 'avg': np.float64(0.072), 'win05': np.float64(0.391), 'med': np.float64(0.026)} 1575
+  hz 24 {'per_bar': 0.005, 'avg': np.float64(0.027), 'win05': np.float64(0.42), 'med': np.float64(-0.015)} 1575
+  hz 48 {'per_bar': 0.005, 'avg': np.float64(0.079), 'win05': np.float64(0.442), 'med': np.float64(-0.017)} 1575
+Traceback (most recent call last):
+  File "/workspace/tuning/sim2.py", line 59, in <module>
+    run(tf)
+  File "/workspace/tuning/sim2.py", line 56, in run
+    print("  maxZones",mz,{k:round(v,3) for k,v in s.items() if isinstance(v.float) if False},s["cnt"],round(s["avg"],3),round(s["win05"],3))
+                                                                           ^^^^^^^
+AttributeError: 'int' object has no attribute 'float'

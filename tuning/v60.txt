@@ -1,0 +1,30 @@
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+### TF=60 bars=8000
+--- zones sweep (maxZones fixed 24) ---
+(34, 2.2, 0.7, 0.75, 'VWMA+EMA', 55) {'cnt': 121, 'per_100bars': 1.512, 'avg': np.float64(1.063), 'win05': np.float64(0.661)}
+(34, 2.2, 0.7, 1.0, 'VWMA+EMA', 55) {'cnt': 121, 'per_100bars': 1.512, 'avg': np.float64(1.063), 'win05': np.float64(0.661)}
+(34, 2.2, 0.7, 0.75, 'VWMA+EMA', 100) {'cnt': 111, 'per_100bars': 1.387, 'avg': np.float64(1.062), 'win05': np.float64(0.658)}
+(34, 2.2, 0.7, 1.0, 'VWMA+EMA', 100) {'cnt': 111, 'per_100bars': 1.387, 'avg': np.float64(1.062), 'win05': np.float64(0.658)}
+(20, 2.2, 0.7, 0.75, 'VWMA+EMA', 55) {'cnt': 123, 'per_100bars': 1.538, 'avg': np.float64(1.06), 'win05': np.float64(0.659)}
+(20, 2.2, 0.7, 0.75, 'LinRegVWMA', 55) {'cnt': 123, 'per_100bars': 1.538, 'avg': np.float64(1.06), 'win05': np.float64(0.659)}
+(20, 2.2, 0.7, 1.0, 'VWMA+EMA', 55) {'cnt': 123, 'per_100bars': 1.538, 'avg': np.float64(1.06), 'win05': np.float64(0.659)}
+(20, 2.2, 0.7, 1.0, 'LinRegVWMA', 55) {'cnt': 123, 'per_100bars': 1.538, 'avg': np.float64(1.06), 'win05': np.float64(0.659)}
+--- best zone cfg across horizons: (34, 2.2, 0.7, 0.75, 'VWMA+EMA', 55)
+ hz 6 {'cnt': 121, 'per_100bars': 1.512, 'avg': np.float64(0.314), 'win05': np.float64(0.397)}
+ hz 12 {'cnt': 121, 'per_100bars': 1.512, 'avg': np.float64(1.063), 'win05': np.float64(0.661)}
+ hz 24 {'cnt': 121, 'per_100bars': 1.512, 'avg': np.float64(2.079), 'win05': np.float64(0.934)}
+ hz 48 {'cnt': 121, 'per_100bars': 1.512, 'avg': np.float64(2.021), 'win05': np.float64(0.711)}
+--- maxZones sensitivity for best cfg: (34, 2.2, 0.7, 0.75, 'VWMA+EMA', 55)
+ mz 12 {'cnt': 121, 'per_100bars': 1.512, 'avg': np.float64(1.063), 'win05': np.float64(0.661)}
+ mz 24 {'cnt': 121, 'per_100bars': 1.512, 'avg': np.float64(1.063), 'win05': np.float64(0.661)}
+ mz 40 {'cnt': 121, 'per_100bars': 1.512, 'avg': np.float64(1.063), 'win05': np.float64(0.661)}
+ mz 60 {'cnt': 121, 'per_100bars': 1.512, 'avg': np.float64(1.063), 'win05': np.float64(0.661)}
+--- VDO sweep ---
+Traceback (most recent call last):
+  File "/workspace/tuning/sim3.py", line 92, in <module>
+    s=vdo_stats(d,vL,8,50,bm,reqI,34,1.65,useR)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/tuning/sim3.py", line 50, in vdo_stats
+    cok=np.asarray((~reqI)|vi)[:n] if False else np.asarray(vi[:n]) if reqI else np.ones(n,dtype=bool)
+                                                                                         ^
+NameError: name 'n' is not defined. Did you mean: 'np'?

@@ -1,0 +1,32 @@
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+/workspace/tuning/sim3.py:50: DeprecationWarning: Bitwise inversion '~' on bool is deprecated and will be removed in Python 3.16. This returns the bitwise inversion of the underlying int object and is usually not what you expect from negating a bool. Use the 'not' operator for boolean negation or ~int(x) if you really want the bitwise inversion of the underlying int.
+  cok=np.asarray((~reqI)|vi)[:n]
+### TF=5 bars=330578
+--- zones sweep (maxZones fixed 24) ---
+(20, 2.2, 0.7, 0.75, 'VWMA+EMA', 100) {'cnt': 527, 'per_100bars': 0.159, 'avg': np.float64(0.178), 'win05': np.float64(0.37)}
+(20, 2.2, 0.7, 1.0, 'VWMA+EMA', 100) {'cnt': 521, 'per_100bars': 0.158, 'avg': np.float64(0.176), 'win05': np.float64(0.37)}
+(20, 2.2, 0.7, 1.0, 'LinRegVWMA', 55) {'cnt': 546, 'per_100bars': 0.165, 'avg': np.float64(0.161), 'win05': np.float64(0.374)}
+(34, 2.2, 0.35, 0.75, 'VWMA+EMA', 100) {'cnt': 1076, 'per_100bars': 0.325, 'avg': np.float64(0.156), 'win05': np.float64(0.389)}
+(20, 2.2, 0.7, 0.75, 'Session VWAP', 55) {'cnt': 563, 'per_100bars': 0.17, 'avg': np.float64(0.154), 'win05': np.float64(0.38)}
+(20, 2.2, 0.7, 1.0, 'Session VWAP', 55) {'cnt': 556, 'per_100bars': 0.168, 'avg': np.float64(0.154), 'win05': np.float64(0.381)}
+(20, 2.2, 0.7, 0.75, 'LinRegVWMA', 55) {'cnt': 552, 'per_100bars': 0.167, 'avg': np.float64(0.153), 'win05': np.float64(0.371)}
+(34, 2.2, 0.7, 1.0, 'VWMA+EMA', 100) {'cnt': 788, 'per_100bars': 0.238, 'avg': np.float64(0.143), 'win05': np.float64(0.377)}
+--- best zone cfg across horizons: (20, 2.2, 0.7, 0.75, 'VWMA+EMA', 100)
+ hz 6 {'cnt': 527, 'per_100bars': 0.159, 'avg': np.float64(0.073), 'win05': np.float64(0.304)}
+ hz 12 {'cnt': 527, 'per_100bars': 0.159, 'avg': np.float64(0.178), 'win05': np.float64(0.37)}
+ hz 24 {'cnt': 527, 'per_100bars': 0.159, 'avg': np.float64(0.156), 'win05': np.float64(0.402)}
+ hz 48 {'cnt': 527, 'per_100bars': 0.159, 'avg': np.float64(0.201), 'win05': np.float64(0.431)}
+--- maxZones sensitivity for best cfg: (20, 2.2, 0.7, 0.75, 'VWMA+EMA', 100)
+ mz 12 {'cnt': 527, 'per_100bars': 0.159, 'avg': np.float64(0.178), 'win05': np.float64(0.37)}
+ mz 24 {'cnt': 527, 'per_100bars': 0.159, 'avg': np.float64(0.178), 'win05': np.float64(0.37)}
+ mz 40 {'cnt': 527, 'per_100bars': 0.159, 'avg': np.float64(0.178), 'win05': np.float64(0.37)}
+ mz 60 {'cnt': 527, 'per_100bars': 0.159, 'avg': np.float64(0.178), 'win05': np.float64(0.37)}
+--- VDO sweep ---
+(10, 1.0, True, True) {'cnt': 1, 'per_100bars': 0.00030250046887572674, 'avg': np.float64(6.849), 'win05': np.float64(1.0)}
+(10, 1.35, True, False) {'cnt': 1, 'per_100bars': 0.00030250046887572674, 'avg': np.float64(6.849), 'win05': np.float64(1.0)}
+(10, 1.35, True, True) {'cnt': 1, 'per_100bars': 0.00030250046887572674, 'avg': np.float64(6.849), 'win05': np.float64(1.0)}
+(10, 1.7, True, False) {'cnt': 1, 'per_100bars': 0.00030250046887572674, 'avg': np.float64(6.849), 'win05': np.float64(1.0)}
+(10, 1.7, True, True) {'cnt': 1, 'per_100bars': 0.00030250046887572674, 'avg': np.float64(6.849), 'win05': np.float64(1.0)}
+(10, 1.0, True, False) {'cnt': 3, 'per_100bars': 0.0009075014066271803, 'avg': np.float64(2.442), 'win05': np.float64(0.667)}
+(20, 1.7, True, False) {'cnt': 4, 'per_100bars': 0.001210001875502907, 'avg': np.float64(1.959), 'win05': np.float64(0.5)}
+(20, 1.35, True, False) {'cnt': 5, 'per_100bars': 0.0015125023443786339, 'avg': np.float64(1.787), 'win05': np.float64(0.6)}

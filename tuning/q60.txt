@@ -1,0 +1,61 @@
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+### TF=60 bars=27758
+--- zones sweep ---
+(50, 2.2, 0.7, 0.75, 'VWMA+EMA', 55) {'cnt': 134, 'per_100bars': 0.483, 'avg': 0.973, 'win05': 0.634}
+(50, 2.2, 0.7, 0.75, 'LinRegVWMA', 55) {'cnt': 135, 'per_100bars': 0.486, 'avg': 0.961, 'win05': 0.63}
+(50, 2.2, 0.7, 0.75, 'VWMA+EMA', 100) {'cnt': 123, 'per_100bars': 0.443, 'avg': 0.956, 'win05': 0.626}
+(34, 2.2, 0.7, 0.75, 'VWMA+EMA', 55) {'cnt': 135, 'per_100bars': 0.486, 'avg': 0.896, 'win05': 0.622}
+(34, 2.2, 0.7, 0.75, 'VWMA+EMA', 100) {'cnt': 123, 'per_100bars': 0.443, 'avg': 0.891, 'win05': 0.618}
+(50, 2.2, 0.5, 0.75, 'VWMA+EMA', 55) {'cnt': 143, 'per_100bars': 0.515, 'avg': 0.891, 'win05': 0.615}
+--- horizons for best: (50, 2.2, 0.7, 0.75, 'VWMA+EMA', 55)
+ hz 6 {'cnt': 134, 'per_100bars': 0.483, 'avg': 0.295, 'win05': 0.396}
+ hz 12 {'cnt': 134, 'per_100bars': 0.483, 'avg': 0.973, 'win05': 0.634}
+ hz 24 {'cnt': 134, 'per_100bars': 0.483, 'avg': 1.853, 'win05': 0.866}
+ hz 48 {'cnt': 134, 'per_100bars': 0.483, 'avg': 1.76, 'win05': 0.664}
+--- VDO zone-confluence test ---
+### TF=60 bars=27758
+--- zones sweep (maxZones fixed 24) ---
+(50, 2.2, 0.7, 0.75, 'VWMA+EMA', 55) {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.973), 'win05': np.float64(0.634)}
+(50, 2.2, 0.7, 1.0, 'VWMA+EMA', 55) {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.973), 'win05': np.float64(0.634)}
+(50, 2.2, 0.7, 0.75, 'LinRegVWMA', 55) {'cnt': 135, 'per_100bars': 0.486, 'avg': np.float64(0.961), 'win05': np.float64(0.63)}
+(50, 2.2, 0.7, 1.0, 'LinRegVWMA', 55) {'cnt': 135, 'per_100bars': 0.486, 'avg': np.float64(0.961), 'win05': np.float64(0.63)}
+(50, 2.2, 0.7, 0.75, 'VWMA+EMA', 100) {'cnt': 123, 'per_100bars': 0.443, 'avg': np.float64(0.956), 'win05': np.float64(0.626)}
+(50, 2.2, 0.7, 1.0, 'VWMA+EMA', 100) {'cnt': 123, 'per_100bars': 0.443, 'avg': np.float64(0.956), 'win05': np.float64(0.626)}
+(34, 2.2, 0.7, 1.0, 'VWMA+EMA', 55) {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.928), 'win05': np.float64(0.627)}
+(34, 2.2, 0.7, 1.0, 'VWMA+EMA', 100) {'cnt': 122, 'per_100bars': 0.44, 'avg': np.float64(0.926), 'win05': np.float64(0.623)}
+--- best zone cfg across horizons: (50, 2.2, 0.7, 0.75, 'VWMA+EMA', 55)
+ hz 6 {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.295), 'win05': np.float64(0.396)}
+ hz 12 {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.973), 'win05': np.float64(0.634)}
+ hz 24 {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(1.853), 'win05': np.float64(0.866)}
+ hz 48 {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(1.76), 'win05': np.float64(0.664)}
+--- maxZones sensitivity for best cfg: (50, 2.2, 0.7, 0.75, 'VWMA+EMA', 55)
+ mz 12 {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.973), 'win05': np.float64(0.634)}
+ mz 24 {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.973), 'win05': np.float64(0.634)}
+ mz 40 {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.973), 'win05': np.float64(0.634)}
+ mz 60 {'cnt': 134, 'per_100bars': 0.483, 'avg': np.float64(0.973), 'win05': np.float64(0.634)}
+--- VDO sweep ---
+(14, 1.35, False, False) {'cnt': 119, 'per_100bars': 0.42870523812954825, 'avg': np.float64(-0.499), 'win05': np.float64(0.202)}
+(14, 1.7, False, False) {'cnt': 104, 'per_100bars': 0.3746667627350674, 'avg': np.float64(-0.517), 'win05': np.float64(0.212)}
+(14, 1.35, False, True) {'cnt': 54, 'per_100bars': 0.19453851142013112, 'avg': np.float64(-0.548), 'win05': np.float64(0.185)}
+(14, 1.0, False, False) {'cnt': 173, 'per_100bars': 0.6232437495496794, 'avg': np.float64(-0.624), 'win05': np.float64(0.162)}
+(14, 1.7, False, True) {'cnt': 45, 'per_100bars': 0.1621154261834426, 'avg': np.float64(-0.638), 'win05': np.float64(0.178)}
+(20, 1.7, False, False) {'cnt': 72, 'per_100bars': 0.25938468189350816, 'avg': np.float64(-0.646), 'win05': np.float64(0.194)}
+(20, 1.35, False, False) {'cnt': 92, 'per_100bars': 0.3314359824194827, 'avg': np.float64(-0.657), 'win05': np.float64(0.185)}
+(10, 1.7, False, False) {'cnt': 155, 'per_100bars': 0.5583975790763023, 'avg': np.float64(-0.666), 'win05': np.float64(0.181)}
+(10, 1.0, 0.3, 50, 1.8, 0.7, 55) {'cnt': 2792, 'per_100bars': 10.058, 'avg': -0.359, 'win05': 0.346}
+(10, 1.0, 0.6, 50, 1.8, 0.7, 55) {'cnt': 2792, 'per_100bars': 10.058, 'avg': -0.359, 'win05': 0.346}
+(10, 1.0, 1.0, 50, 1.8, 0.7, 55) {'cnt': 2792, 'per_100bars': 10.058, 'avg': -0.359, 'win05': 0.346}
+(10, 1.0, 0.3, 50, 2.2, 0.7, 55) {'cnt': 2671, 'per_100bars': 9.622, 'avg': -0.374, 'win05': 0.344}
+(10, 1.0, 0.6, 50, 2.2, 0.7, 55) {'cnt': 2671, 'per_100bars': 9.622, 'avg': -0.374, 'win05': 0.344}
+(10, 1.0, 1.0, 50, 2.2, 0.7, 55) {'cnt': 2671, 'per_100bars': 9.622, 'avg': -0.374, 'win05': 0.344}
+(20, 1.0, 0.3, 50, 1.8, 0.7, 55) {'cnt': 1305, 'per_100bars': 4.701, 'avg': -0.388, 'win05': 0.336}
+(20, 1.0, 0.6, 50, 1.8, 0.7, 55) {'cnt': 1305, 'per_100bars': 4.701, 'avg': -0.388, 'win05': 0.336}
+(20, 1.0, 1.0, 50, 1.8, 0.7, 55) {'cnt': 1305, 'per_100bars': 4.701, 'avg': -0.388, 'win05': 0.336}
+(10, 1.0, 0.3, 20, 2.2, 0.7, 55) {'cnt': 2574, 'per_100bars': 9.273, 'avg': -0.389, 'win05': 0.334}
+(10, 1.0, 0.6, 20, 2.2, 0.7, 55) {'cnt': 2574, 'per_100bars': 9.273, 'avg': -0.389, 'win05': 0.334}
+(10, 1.0, 1.0, 20, 2.2, 0.7, 55) {'cnt': 2574, 'per_100bars': 9.273, 'avg': -0.389, 'win05': 0.334}
+--- horizons best: (10, 1.0, 0.3, 50, 1.8, 0.7, 55)
+ hz 6 {'cnt': 2754, 'per_100bars': 9.921, 'avg': -0.137, 'win05': 0.31}
+ hz 12 {'cnt': 2754, 'per_100bars': 9.921, 'avg': -0.359, 'win05': 0.347}
+ hz 24 {'cnt': 2754, 'per_100bars': 9.921, 'avg': -0.543, 'win05': 0.358}
+ hz 48 {'cnt': 2754, 'per_100bars': 9.921, 'avg': -0.762, 'win05': 0.395}
