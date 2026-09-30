@@ -153,13 +153,14 @@ if array.size(demandTops) > 0
             lastDemandTouchBar := bar_index
         if tested
             array.set(demandTouched, i, true)
-            box dBox = array.get(demandBoxes, i)
-            if showZones and not broken and not na(dBox)
+        box dBox = array.get(demandBoxes, i)
+        if showZones and not na(dBox)
+            if broken
+                box.delete(dBox)
+                array.set(demandBoxes, i, na)
+            else if tested
                 box.set_bgcolor(dBox, color.new(bullColor, 79))
                 box.set_border_color(dBox, color.new(bullColor, 15))
-        if showZones and broken and not na(array.get(demandBoxes, i))
-            box.delete(array.get(demandBoxes, i))
-            array.set(demandBoxes, i, na)
 
 if array.size(supplyTops) > 0
     for i = 0 to array.size(supplyTops) - 1
@@ -174,13 +175,14 @@ if array.size(supplyTops) > 0
             lastSupplyTouchBar := bar_index
         if tested
             array.set(supplyTouched, i, true)
-            box sBox = array.get(supplyBoxes, i)
-            if showZones and not broken and not na(sBox)
+        box sBox = array.get(supplyBoxes, i)
+        if showZones and not na(sBox)
+            if broken
+                box.delete(sBox)
+                array.set(supplyBoxes, i, na)
+            else if tested
                 box.set_bgcolor(sBox, color.new(bearColor, 79))
                 box.set_border_color(sBox, color.new(bearColor, 15))
-        if showZones and broken and not na(array.get(supplyBoxes, i))
-            box.delete(array.get(supplyBoxes, i))
-            array.set(supplyBoxes, i, na)
 
 // Fresh first-touch of an opposite-side zone within the lookback window.
 bool freshDemandTouch = lastDemandTouchBar > 0 and bar_index - lastDemandTouchBar <= touchLookback and priceAboveRegme
