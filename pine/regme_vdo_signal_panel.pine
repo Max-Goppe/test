@@ -169,10 +169,13 @@ bool freshDemandTouch = not na(lastDemandTouchBar) and bar_index - lastDemandTou
 bool freshSupplyTouch = not na(lastSupplyTouchBar) and bar_index - lastSupplyTouchBar <= touchLookback and not priceAboveRegme
 
 // Impulse freshness: a qualifying impulse happened recently and we are still on that side of REGME.
+// ta.barssince() must be called at global scope (not inside table blocks later).
 bool bullImpulseNow = bullishImpulse
 bool bearImpulseNow = bearishImpulse
-bool freshBullImpulse = ta.barssince(bullImpulseNow) <= impulseAgeMax and priceAboveRegme
-bool freshBearImpulse = ta.barssince(bearImpulseNow) <= impulseAgeMax and not priceAboveRegme
+int bullImpulseAge = ta.barssince(bullImpulseNow)
+int bearImpulseAge = ta.barssince(bearImpulseNow)
+bool freshBullImpulse = not na(bullImpulseAge) and bullImpulseAge <= impulseAgeMax and priceAboveRegme
+bool freshBearImpulse = not na(bearImpulseAge) and bearImpulseAge <= impulseAgeMax and not priceAboveRegme
 
 // VDO oscillator + dynamic bands (mirrors vdo_volume_direction.pine).
 float signedVolume = close > close[1] ? vol : close < close[1] ? -vol : 0.0
@@ -205,17 +208,17 @@ if buySignal or sellSignal
     lastSignalBar := bar_index
 
 // ────────────────────────── Visuals: flags / arrows / labels ──────────────────────────
-shape bullShape = signalStyle == "Arrow" ? shape.arrowup : signalStyle == "Flag" ? shape.flag : shape.none
-shape bearShape = signalStyle == "Arrow" ? shape.arrowdown : signalStyle == "Flag" ? shape.flag : shape.none
-string bullTxt = signalStyle == "Label only" ? "BUY" : ""
-string bearTxt = signalStyle == "Label only" ? "SELL" : ""
+// NOTE: Pine has no "shape" keyword; the plotshape() shape argument is passed inline.
+// "Flag" mode uses flagup/flagdown; "Label only" hides the marker and prints text instead.
+string bullTxt = signalStyle == "Label only" ? "BUY" : signalStyle == "Flag" ? "" : ""
+string bearTxt = signalStyle == "Label only" ? "SELL" : signalStyle == "Flag" ? "" : ""
 
-plotshape(buySignal, "BUY signal", bullShape, location.belowbar, bullColor, size = size.normal, text = bullTxt, textcolor = bullColor)
-plotshape(sellSignal, "SELL signal", bearShape, location.abovebar, bearColor, size = size.normal, text = bearTxt, textcolor = bearColor)
+plotshape(signalStyle != "Label only" and buySignal, "BUY signal", signalStyle == "Arrow" ? shape.arrowup : shape.flagup, location.belowbar, bullColor, size = size.normal, text = bullTxt, textcolor = bullColor)
+plotshape(signalStyle != "Label only" and sellSignal, "SELL signal", signalStyle == "Arrow" ? shape.arrowdown : shape.flagdown, location.abovebar, bearColor, size = size.normal, text = bearTxt, textcolor = bearColor)
 if buySignal
-    label.new(bar_index, low, " BUY ", style = label.style_none, textcolor = bullColor, size = size.small)
+    label.new(bar_index, signalStyle == "Label only" ? low : high, signalStyle == "Label only" ? "BUY" : "▲ BUY", style = label.style_label_up, color = color.new(bullColor, 15), textcolor = color.black, size = size.small)
 if sellSignal
-    label.new(bar_index, high, " SELL ", style = label.style_none, textcolor = bearColor, size = size.small)
+    label.new(bar_index, signalStyle == "Label only" ? high : low, signalStyle == "Label only" ? "SELL" : "▼ SELL", style = label.style_label_down, color = color.new(bearColor, 15), textcolor = color.black, size = size.small)
 
 // ────────────────────────── Status table ──────────────────────────
 cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
@@ -230,7 +233,7 @@ if showTable and barstate.islast
     table.cell(panel, 0, 1, "REGME side", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 1, priceAboveRegme ? "above (bull)" : "below (bear)", text_color = priceAboveRegme ? bullColor : bearColor, text_size = size.small)
     table.cell(panel, 0, 2, "Fresh impulse", text_color = color.silver, text_size = size.small)
-    table.cell(panel, 1, 2, freshBullImpulse ? "bull #" + str.tostring(ta.barssince(bullImpulseNow)) : freshBearImpulse ? "bear #" + str.tostring(ta.barssince(bearImpulseNow)) : "none", text_color = color.white, text_size = size.small)
+    table.cell(panel, 1, 2, freshBullImpulse ? "bull #" + str.tostring(bullImpulseAge) : freshBearImpulse ? "bear #" + str.tostring(bearImpulseAge) : "none", text_color = color.white, text_size = size.small)
     table.cell(panel, 0, 3, "Zone touch", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 3, freshDemandTouch ? "demand T" : freshSupplyTouch ? "supply T" : "none", text_color = color.white, text_size = size.small)
     table.cell(panel, 0, 4, "VDO", text_color = color.silver, text_size = size.small)
