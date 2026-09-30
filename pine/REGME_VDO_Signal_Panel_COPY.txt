@@ -212,11 +212,9 @@ if buySignal or sellSignal
 // ────────────────────────── Visuals: flags / arrows / labels ──────────────────────────
 // NOTE: Pine has no "shape" keyword; the plotshape() shape argument is passed inline.
 // "Flag" mode uses flagup/flagdown; "Label only" hides the marker and prints text instead.
-string bullTxt = signalStyle == "Label only" ? "BUY" : signalStyle == "Flag" ? "" : ""
-string bearTxt = signalStyle == "Label only" ? "SELL" : signalStyle == "Flag" ? "" : ""
-
-plotshape(signalStyle != "Label only" and buySignal, "BUY signal", signalStyle == "Arrow" ? shape.arrowup : shape.flagup, location.belowbar, bullColor, size = size.normal, text = bullTxt, textcolor = bullColor)
-plotshape(signalStyle != "Label only" and sellSignal, "SELL signal", signalStyle == "Arrow" ? shape.arrowdown : shape.flagdown, location.abovebar, bearColor, size = size.normal, text = bearTxt, textcolor = bearColor)
+// plotshape() requires const string for text -> use literal texts here.
+plotshape(signalStyle != "Label only" and buySignal, "BUY signal", signalStyle == "Arrow" ? shape.arrowup : shape.flagup, location.belowbar, bullColor, size = size.normal, text = "BUY", textcolor = bullColor)
+plotshape(signalStyle != "Label only" and sellSignal, "SELL signal", signalStyle == "Arrow" ? shape.arrowdown : shape.flagdown, location.abovebar, bearColor, size = size.normal, text = "SELL", textcolor = bearColor)
 if buySignal
     label.new(bar_index, signalStyle == "Label only" ? low : high, signalStyle == "Label only" ? "BUY" : "▲ BUY", style = label.style_label_up, color = color.new(bullColor, 15), textcolor = color.black, size = size.small)
 if sellSignal
