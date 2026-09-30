@@ -100,11 +100,13 @@ var array<float> demandBottoms = array.new<float>()
 var array<int>   demandBirth = array.new<int>()
 var array<bool>  demandTouched = array.new<bool>()
 var array<box>   demandBoxes = array.new<box>()
+var array<label> demandTouchLabels = array.new<label>()
 var array<float> supplyTops = array.new<float>()
 var array<float> supplyBottoms = array.new<float>()
 var array<int>   supplyBirth = array.new<int>()
 var array<bool>  supplyTouched = array.new<bool>()
 var array<box>   supplyBoxes = array.new<box>()
+var array<label> supplyTouchLabels = array.new<label>()
 
 if bullishImpulse
     float zTop = zoneUseWicks ? math.min(open, close) : math.max(open, close)
@@ -112,10 +114,12 @@ if bullishImpulse
     array.push(demandBottoms, low)
     array.push(demandBirth, bar_index)
     array.push(demandTouched, false)
-    box newDemand = showZones ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 45), bgcolor = color.new(bullColor, 87), border_width = 1) : na
-    array.push(demandBoxes, newDemand)
+    box dBoxNew = showZones ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 45), bgcolor = color.new(bullColor, 87), border_width = 1) : na
+    array.push(demandBoxes, dBoxNew)
+    array.push(demandTouchLabels, na)
     if array.size(demandTops) > maxZones
         box.delete(array.shift(demandBoxes))
+        label.delete(array.shift(demandTouchLabels))
         array.shift(demandTops)
         array.shift(demandBottoms)
         array.shift(demandBirth)
@@ -127,16 +131,18 @@ if bearishImpulse
     array.push(supplyBottoms, zBottom)
     array.push(supplyBirth, bar_index)
     array.push(supplyTouched, false)
-    box newSupply = showZones ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 45), bgcolor = color.new(bearColor, 87), border_width = 1) : na
-    array.push(supplyBoxes, newSupply)
+    box sBoxNew = showZones ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 45), bgcolor = color.new(bearColor, 87), border_width = 1) : na
+    array.push(supplyBoxes, sBoxNew)
+    array.push(supplyTouchLabels, na)
     if array.size(supplyTops) > maxZones
         box.delete(array.shift(supplyBoxes))
+        label.delete(array.shift(supplyTouchLabels))
         array.shift(supplyTops)
         array.shift(supplyBottoms)
         array.shift(supplyBirth)
         array.shift(supplyTouched)
 
-// First-touch tracking: existing boxes are only recolored once, never recreated.
+// First-touch tracking: each box/label is created ONCE at zone birth; later bars only update right edge / recolor.
 var int lastDemandTouchBar = 0
 var int lastSupplyTouchBar = 0
 
@@ -153,14 +159,18 @@ if array.size(demandTops) > 0
             lastDemandTouchBar := bar_index
         if tested
             array.set(demandTouched, i, true)
-        box dBox = array.get(demandBoxes, i)
-        if showZones and not na(dBox)
-            if broken
-                box.delete(dBox)
+        if showZones
+            box dB = array.get(demandBoxes, i)
+            if broken and not na(dB)
+                box.delete(dB)
                 array.set(demandBoxes, i, na)
-            else if tested
-                box.set_bgcolor(dBox, color.new(bullColor, 79))
-                box.set_border_color(dBox, color.new(bullColor, 15))
+            else if not na(dB)
+                box.set_right(dB, bar_index + zoneExtendBars)
+                if tested
+                    box.set_bgcolor(dB, color.new(bullColor, 79))
+                    box.set_border_color(dB, color.new(bullColor, 15))
+            if inZone and bar_index > birth and not wasTested and not broken and na(array.get(demandTouchLabels, i))
+                array.set(demandTouchLabels, i, label.new(bar_index, bottom, "T", style = label.style_label_up, color = color.new(bullColor, 20), textcolor = color.black, size = size.tiny))
 
 if array.size(supplyTops) > 0
     for i = 0 to array.size(supplyTops) - 1
@@ -175,14 +185,18 @@ if array.size(supplyTops) > 0
             lastSupplyTouchBar := bar_index
         if tested
             array.set(supplyTouched, i, true)
-        box sBox = array.get(supplyBoxes, i)
-        if showZones and not na(sBox)
-            if broken
-                box.delete(sBox)
+        if showZones
+            box sB = array.get(supplyBoxes, i)
+            if broken and not na(sB)
+                box.delete(sB)
                 array.set(supplyBoxes, i, na)
-            else if tested
-                box.set_bgcolor(sBox, color.new(bearColor, 79))
-                box.set_border_color(sBox, color.new(bearColor, 15))
+            else if not na(sB)
+                box.set_right(sB, bar_index + zoneExtendBars)
+                if tested
+                    box.set_bgcolor(sB, color.new(bearColor, 79))
+                    box.set_border_color(sB, color.new(bearColor, 15))
+            if inZone and bar_index > birth and not wasTested and not broken and na(array.get(supplyTouchLabels, i))
+                array.set(supplyTouchLabels, i, label.new(bar_index, top, "T", style = label.style_label_down, color = color.new(bearColor, 20), textcolor = color.black, size = size.tiny))
 
 // Fresh first-touch of an opposite-side zone within the lookback window.
 bool freshDemandTouch = lastDemandTouchBar > 0 and bar_index - lastDemandTouchBar <= touchLookback and priceAboveRegme
@@ -229,24 +243,22 @@ bool sellSignal = rawSell and not inCooldown
 if buySignal or sellSignal
     lastSignalBar := bar_index
 
-// ────────────────────────── Visuals: flags / arrows / labels ──────────────────────────
+// ────────────────────────── Visuals ──────────────────────────
+// plotshape()/plotchar() args must be const -> separate pre-declared calls per style.
+// All shape/text/size values below are literal constants; conditions are series bools (allowed).
+buyFlag  = buySignal and signalStyle == "Flag"
+sellFlag = sellSignal and signalStyle == "Flag"
+buyArrow = buySignal and signalStyle == "Arrow"
+sellArrow = sellSignal and signalStyle == "Arrow"
+buyChar  = buySignal and signalStyle == "Label only"
+sellChar = sellSignal and signalStyle == "Label only"
 
-
-
-if buySignal
-    if signalStyle == "Flag"
-        label.new(bar_index, low, "🏳 BUY", style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
-    else if signalStyle == "Arrow"
-        label.new(bar_index, low, "⬆ BUY", style = label.style_label_up, color = color.new(bullColor, 15), textcolor = color.black, size = size.normal)
-    else
-        label.new(bar_index, low, "BUY", style = label.style_label_up, color = color.new(bullColor, 15), textcolor = bullColor, size = size.normal)
-if sellSignal
-    if signalStyle == "Flag"
-        label.new(bar_index, high, "🏳 SELL", style = label.style_label_down, color = bearColor, textcolor = color.black, size = size.normal)
-    else if signalStyle == "Arrow"
-        label.new(bar_index, high, "⬇ SELL", style = label.style_label_down, color = color.new(bearColor, 15), textcolor = color.black, size = size.normal)
-    else
-        label.new(bar_index, high, "SELL", style = label.style_label_down, color = color.new(bearColor, 15), textcolor = bearColor, size = size.normal)
+plotshape(buyFlag, "BUY flag", shape.flagup, location.belowbar, bullColor, size = size.normal, text = "BUY", textcolor = bullColor)
+plotshape(sellFlag, "SELL flag", shape.flagdown, location.abovebar, bearColor, size = size.normal, text = "SELL", textcolor = bearColor)
+plotshape(buyArrow, "BUY arrow", shape.arrowup, location.belowbar, bullColor, size = size.normal, text = "BUY", textcolor = bullColor)
+plotshape(sellArrow, "SELL arrow", shape.arrowdown, location.abovebar, bearColor, size = size.normal, text = "SELL", textcolor = bearColor)
+plotchar(buyChar, "BUY mark", "▲", location.belowbar, bullColor, size = size.small)
+plotchar(sellChar, "SELL mark", "▼", location.abovebar, bearColor, size = size.small)
 
 // ────────────────────────── Status table ──────────────────────────
 cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
