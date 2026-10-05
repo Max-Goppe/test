@@ -238,24 +238,23 @@ if buySignal or sellSignal
     lastSignalBar := bar_index
 
 // ────────────────────────── Visuals ──────────────────────────
-// plotshape()/plotchar() args must be const -> separate pre-declared calls per style.
-// All shape/text/size values below are literal constants; conditions are series bools (allowed).
-buyFlag  = buySignal and signalStyle == "Flag"
-sellFlag = sellSignal and signalStyle == "Flag"
-buyArrow = buySignal and signalStyle == "Arrow"
-sellArrow = sellSignal and signalStyle == "Arrow"
-buyChar  = buySignal and signalStyle == "Label only"
-sellChar = sellSignal and signalStyle == "Label only"
+// Signals and zone-touch marks drawn via label.new() only: label arguments accept
+// series values, so no const-arg compile errors (CE10123/CE10272) are possible here.
+if buySignal
+    string buyText = signalStyle == "Arrow" ? "↑ BUY" : "⚑ BUY"
+    label.new(bar_index, low, buyText, style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
+if sellSignal
+    string sellText = signalStyle == "Arrow" ? "↓ SELL" : "⚑ SELL"
+    label.new(bar_index, high, sellText, style = label.style_label_down, color = bearColor, textcolor = color.black, size = size.normal)
+if signalStyle == "Label only" and buySignal
+    label.new(bar_index, low, "BUY", style = label.style_none, color = color.new(color.white, 100), textcolor = bullColor, size = size.normal)
+if signalStyle == "Label only" and sellSignal
+    label.new(bar_index, high, "SELL", style = label.style_none, color = color.new(color.white, 100), textcolor = bearColor, size = size.normal)
 
-plotshape(buyFlag, "BUY flag", shape.flagup, location.belowbar, bullColor, size = size.normal, text = "BUY", textcolor = bullColor)
-plotshape(sellFlag, "SELL flag", shape.flagdown, location.abovebar, bearColor, size = size.normal, text = "SELL", textcolor = bearColor)
-plotshape(buyArrow, "BUY arrow", shape.arrowup, location.belowbar, bullColor, size = size.normal, text = "BUY", textcolor = bullColor)
-plotshape(sellArrow, "SELL arrow", shape.arrowdown, location.abovebar, bearColor, size = size.normal, text = "SELL", textcolor = bearColor)
-plotchar(buyChar, "BUY mark", "▲", location.belowbar, bullColor, size = size.small)
-plotchar(sellChar, "SELL mark", "▼", location.abovebar, bearColor, size = size.small)
-
-plotshape(touchDemandThisBar, "Demand first touch", shape.triangleup, location.belowbar, bullColor, size = size.tiny, text = "T", textcolor = bullColor)
-plotshape(touchSupplyThisBar, "Supply first touch", shape.triangledown, location.abovebar, bearColor, size = size.tiny, text = "T", textcolor = bearColor)
+if touchDemandThisBar
+    label.new(bar_index, low, "T", style = label.style_label_up, color = color.new(bullColor, 60), textcolor = bullColor, size = size.tiny)
+if touchSupplyThisBar
+    label.new(bar_index, high, "T", style = label.style_label_down, color = color.new(bearColor, 60), textcolor = bearColor, size = size.tiny)
 
 // ────────────────────────── Status table ──────────────────────────
 cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
