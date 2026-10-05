@@ -1,0 +1,34 @@
+nohup: ignoring input
+M5 bars: 330578
+M15 bars: 110192
+H1 bars: 27548
+SANITY tuned @H1: obj=+0.459 | h6: avg=+0.347 win=55% n=121 | h12: avg=+0.432 win=54% n=121 | h24: avg=+0.598 win=53% n=121
+
+=== STAGE 3 top vdo/volbase ===
+obj=+0.481 win@24=55% n=161 | {'vdoLen': 10, 'vdoSig': 13, 'bandMult': 1.0, 'volbase': 34}
+obj=+0.468 win@24=52% n=141 | {'vdoLen': 14, 'vdoSig': 8, 'bandMult': 1.0, 'volbase': 50}
+obj=+0.460 win@24=52% n=108 | {'vdoLen': 14, 'vdoSig': 8, 'bandMult': 1.8, 'volbase': 50}
+obj=+0.459 win@24=51% n=120 | {'vdoLen': 20, 'vdoSig': 5, 'bandMult': 1.0, 'volbase': 34}
+obj=+0.459 win@24=53% n=121 | {'vdoLen': 14, 'vdoSig': 8, 'bandMult': 1.35, 'volbase': 50}
+obj=+0.457 win@24=53% n=114 | {'vdoLen': 14, 'vdoSig': 5, 'bandMult': 1.35, 'volbase': 50}
+
+FINAL FULL: {'regmeLen': 55, 'smooth': 8, 'volbase': 34, 'volmult': 2.8, 'bodyAtr': 0.5, 'rangeAtr': 0.8, 'vdoLen': 10, 'vdoSig': 13, 'bandLen': 50, 'bandMult': 1.0, 'minConf': 2, 'touchLook': 1, 'brkLook': 3, 'impulseAge': 40, 'cooldown': 20}
+FINAL3 @H1: obj=+0.481 | h6: avg=+0.280 win=53% n=161 | h12: avg=+0.466 win=57% n=161 | h24: avg=+0.698 win=55% n=161
+FINAL3 @M15: obj=+0.128 | h6: avg=+0.098 win=50% n=519 | h12: avg=+0.090 win=52% n=519 | h24: avg=+0.197 win=51% n=519
+
+yearly avg ATR h24 FINAL3:
+  2022: n=3 avg=-1.063 win=33%
+  2023: n=52 avg=+0.949 win=60%
+  2024: n=67 avg=+0.384 win=55%
+  2025: n=25 avg=+1.320 win=52%
+  2026: n=14 avg=+0.528 win=43%
+OLD M15 preset @M15: obj=+0.139 | h6: avg=+0.092 win=51% n=818 | h12: avg=+0.061 win=51% n=818 | h24: avg=+0.265 win=51% n=818
+
+=== M15 top rules ===
+obj=+0.386 win@24=54% n=61 | {'minConf': 3, 'touchLook': 1, 'brkLook': 2, 'impulseAge': 15, 'cooldown': 40}
+obj=+0.386 win@24=54% n=61 | {'minConf': 3, 'touchLook': 1, 'brkLook': 2, 'impulseAge': 25, 'cooldown': 40}
+obj=+0.386 win@24=54% n=61 | {'minConf': 3, 'touchLook': 1, 'brkLook': 2, 'impulseAge': 40, 'cooldown': 40}
+obj=+0.297 win@24=54% n=74 | {'minConf': 3, 'touchLook': 3, 'brkLook': 2, 'impulseAge': 15, 'cooldown': 40}
+obj=+0.297 win@24=54% n=74 | {'minConf': 3, 'touchLook': 3, 'brkLook': 2, 'impulseAge': 25, 'cooldown': 40}
+obj=+0.296 win@24=55% n=69 | {'minConf': 3, 'touchLook': 2, 'brkLook': 2, 'impulseAge': 15, 'cooldown': 40}
+M15 tuned(rules+core) @M15: obj=+0.659 | h6: avg=+0.273 win=45% n=42 | h12: avg=+0.652 win=67% n=42 | h24: avg=+1.053 win=55% n=42

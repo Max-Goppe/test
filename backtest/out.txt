@@ -1,0 +1,14 @@
+M5 bars: 330578
+M15 bars: 110192
+H1 bars: 27548
+Traceback (most recent call last):
+  File "/workspace/backtest/rvp_backtest.py", line 172, in <module>
+    _,sigs,atr,c,_ = run_tf(rows_h1,'H1',cfg)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/backtest/rvp_backtest.py", line 129, in run_tf
+    vdoS = any(0<=i-j<=cfg['brkLook'] for j in bearBrk) and vdo[i]<vdoSig[i]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/backtest/rvp_backtest.py", line 129, in <genexpr>
+    vdoS = any(0<=i-j<=cfg['brkLook'] for j in bearBrk) and vdo[i]<vdoSig[i]
+               ^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

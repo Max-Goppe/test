@@ -16,12 +16,12 @@ bool isM15 = tfMode == "M15" or (tfMode == "Auto" and timeframe.period == "15")
 bool isH1  = tfMode == "H1"  or (tfMode == "Auto" and timeframe.period == "60")
 
 int   cfgRegmeLength   = isM15 ? 100 : 55
-float cfgVolumeMult    = isH1 ? 2.2 : isM15 ? 1.8 : 1.3
-float cfgMinBodyAtr    = isH1 ? 0.70 : isM15 ? 0.50 : 0.30
-float cfgMinRangeAtr   = isH1 ? 1.10 : isM15 ? 0.90 : 0.70
-int   cfgVolumeBaseLen = isH1 ? 50 : 34
+float cfgVolumeMult    = isH1 ? 2.8 : isM15 ? 1.8 : 1.3
+float cfgMinBodyAtr    = isH1 ? 0.50 : isM15 ? 0.50 : 0.30
+float cfgMinRangeAtr   = isH1 ? 0.80 : isM15 ? 0.90 : 0.70
+int   cfgVolumeBaseLen = isH1 ? 34 : 34
 int   cfgVdoBandLength = isH1 ? 50 : 34
-float cfgVdoBandMult   = 1.35
+float cfgVdoBandMult   = isH1 ? 1.0 : 1.35
 
 groupRegme = "REGME core"
 regmeMode = input.string("VWMA + EMA", "Mean type", options = ["VWMA + EMA", "Session VWAP", "LinReg VWMA"], group = groupRegme)
@@ -43,19 +43,19 @@ zoneExtendBars = input.int(250, "Zone projection bars", minval = 10, maxval = 50
 zoneUseWicks = input.bool(true, "Use wick-to-body zones", group = groupZones)
 
 groupVdo = "VDO oscillator"
-vdoLength = input.int(14, "VDO length", minval = 2, group = groupVdo)
-vdoSignalLength = input.int(8, "VDO signal length", minval = 1, group = groupVdo)
+vdoLength = input.int(10, "VDO length", minval = 2, group = groupVdo)
+vdoSignalLength = input.int(13, "VDO signal length", minval = 1, group = groupVdo)
 vdoBandLength = input.int(0, "VDO band length (0 = from preset)", minval = 0, group = groupVdo)
 vdoBandMult = input.float(0.0, "VDO band width (0 = from preset)", minval = 0.0, step = 0.05, group = groupVdo)
 
 groupSignal = "Signal rules"
 minConfluence = input.int(2, "Min confluence score (2-3)", minval = 2, maxval = 3, group = groupSignal,
-     tooltip = "3 = strictest: requires fresh impulse AND first untouched-zone touch AND VDO breakout. 2 = allows one missing leg.")
-touchLookback = input.int(3, "Zone touch valid N bars", minval = 1, maxval = 10, group = groupSignal)
+     tooltip = "Backtest GOLD H1 2022-2026: 2 works best. On M15 set 3 (strict).")
+touchLookback = input.int(1, "Zone touch valid N bars", minval = 1, maxval = 10, group = groupSignal)
 breakoutLookback = input.int(3, "VDO breakout valid N bars", minval = 1, maxval = 10, group = groupSignal)
-impulseAgeMax = input.int(15, "Impulse zone age limit (bars)", minval = 3, maxval = 100, group = groupSignal)
+impulseAgeMax = input.int(40, "Impulse zone age limit (bars)", minval = 3, maxval = 100, group = groupSignal)
 requireVdo = input.bool(true, "Require VDO confirmation", group = groupSignal)
-cooldownBars = input.int(10, "Signal cooldown bars", minval = 0, maxval = 100, group = groupSignal)
+cooldownBars = input.int(20, "Signal cooldown bars", minval = 0, maxval = 100, group = groupSignal)
 
 groupVisuals = "Visuals"
 signalStyle = input.string("Flag", "Signal shape", options = ["Flag", "Arrow", "Label only"], group = groupVisuals)

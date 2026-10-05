@@ -1,0 +1,39 @@
+nohup: ignoring input
+M5 bars: 330578
+M15 bars: 110192
+H1 bars: 27548
+== sanity ==
+DEFAULT @H1: obj=-0.236 | h6: avg=-0.098 win=46% n=132 | h12: avg=-0.184 win=49% n=132 | h24: avg=-0.426 win=45% n=132
+
+=== STAGE 1 top rules ===
+obj=+0.194 win@24=49% n=130 | conf=2 touch=1 brk=3 age=40 cd=20
+obj=+0.168 win@24=50% n=130 | conf=2 touch=1 brk=5 age=40 cd=20
+obj=+0.164 win@24=49% n=129 | conf=2 touch=1 brk=1 age=40 cd=20
+obj=+0.160 win@24=49% n=129 | conf=2 touch=1 brk=2 age=40 cd=20
+obj=+0.109 win@24=53% n=98 | conf=2 touch=1 brk=2 age=40 cd=40
+obj=+0.109 win@24=53% n=98 | conf=2 touch=1 brk=3 age=40 cd=40
+obj=+0.104 win@24=48% n=84 | conf=2 touch=1 brk=1 age=5 cd=40
+obj=+0.103 win@24=48% n=132 | conf=2 touch=2 brk=3 age=40 cd=20
+
+=== STAGE 2 top core params ===
+obj=+0.459 win@24=53% n=121 | volm=2.8 body=0.5 rng=0.8 regmeL=55
+obj=+0.450 win@24=53% n=114 | volm=2.8 body=0.5 rng=1.1 regmeL=55
+obj=+0.419 win@24=50% n=72 | volm=3.5 body=0.5 rng=1.4 regmeL=55
+obj=+0.418 win@24=50% n=72 | volm=3.5 body=0.5 rng=1.4 regmeL=89
+obj=+0.355 win@24=52% n=121 | volm=2.8 body=0.5 rng=1.1 regmeL=89
+obj=+0.352 win@24=52% n=147 | volm=2.2 body=0.5 rng=1.1 regmeL=55
+obj=+0.343 win@24=51% n=95 | volm=2.8 body=0.5 rng=1.4 regmeL=55
+obj=+0.336 win@24=52% n=127 | volm=2.8 body=0.5 rng=0.8 regmeL=89
+
+FINAL: {'minConf': 2, 'touchLook': 1, 'brkLook': 3, 'impulseAge': 40, 'cooldown': 20, 'volmult': 2.8, 'bodyAtr': 0.5, 'rangeAtr': 0.8, 'regmeLen': 55}
+FINAL @H1: obj=+0.459 | h6: avg=+0.347 win=55% n=121 | h12: avg=+0.432 win=54% n=121 | h24: avg=+0.598 win=53% n=121
+FINAL @M15: obj=+0.043 | h6: avg=+0.026 win=50% n=393 | h12: avg=+0.014 win=49% n=393 | h24: avg=+0.087 win=48% n=393
+
+yearly avg ATR (h24):
+  2022: n=2 avg=-0.235 win=50%
+  2023: n=37 avg=+0.886 win=59%
+  2024: n=50 avg=+0.210 win=54%
+  2025: n=19 avg=+1.104 win=47%
+  2026: n=13 avg=+0.659 win=38%
+
+B&H yearly move (ATR units of H1):
