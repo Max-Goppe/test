@@ -334,11 +334,8 @@ if posOpen
         curSl := na
         curTp := na
         curDir := 0
-    else if showTpSlLines
-        if not na(tpLine)
-            line.set_right(tpLine, bar_index + 5)
-        if not na(slLine)
-            line.set_right(slLine, bar_index + 5)
+    // Lines are created with extend.right, so they keep growing automatically;
+    // no per-bar endpoint update is needed (line.set_right does not exist in Pine v6).
 
 // After exit, keep the lines visible for a few bars, then delete them.
 var int exitFadeBar = 0
