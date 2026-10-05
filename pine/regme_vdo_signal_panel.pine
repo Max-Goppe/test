@@ -1,6 +1,6 @@
 //@version=6
 // This is a Pine Script v6 INDICATOR (not a strategy) - it only displays signals, no orders.
-indicator("INV REGME+VDO Signal Panel", "RVP SIGNAL", overlay = true, max_labels_count = 50, max_boxes_count = 160, precision = 2)
+indicator("INV REGME+VDO Signal Panel", "RVP SIGNAL", overlay = true, max_labels_count = 20, max_boxes_count = 50, precision = 2)
 
 // Combined signal engine for REGME + VDO, following the tuning conclusions from the MT5 GOLD M5 export:
 //  - best reaction on H1; zone-touch entries with trend; VDO band-breakout confirmation;
@@ -38,7 +38,7 @@ minRangeAtr = input.float(0.0, "Min range / ATR (0 = from preset)", minval = 0.0
 
 groupZones = "Dynamic zones"
 showZones = input.bool(true, "Show dynamic zones", group = groupZones)
-maxZones = input.int(24, "Max zones per side", minval = 1, maxval = 75, group = groupZones)
+maxZones = input.int(16, "Max zones per side", minval = 1, maxval = 20, group = groupZones)
 zoneExtendBars = input.int(250, "Zone projection bars", minval = 10, maxval = 500, group = groupZones)
 zoneUseWicks = input.bool(true, "Use wick-to-body zones", group = groupZones)
 
