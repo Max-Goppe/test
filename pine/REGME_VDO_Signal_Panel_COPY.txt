@@ -1,6 +1,6 @@
 //@version=6
 // This is a Pine Script v6 INDICATOR (not a strategy) - it only displays signals, no orders.
-indicator("INV REGME+VDO Signal Panel", "RVP SIGNAL", overlay = true, max_labels_count = 20, max_boxes_count = 50, precision = 2)
+indicator("INV REGME+VDO Signal Panel", "RVP SIGNAL", overlay = true, max_labels_count = 50, max_boxes_count = 50, max_lines_count = 50, precision = 2)
 
 // Combined signal engine for REGME + VDO, following the tuning conclusions from the MT5 GOLD M5 export:
 //  - best reaction on H1; zone-touch entries with trend; VDO band-breakout confirmation;
@@ -56,6 +56,17 @@ breakoutLookback = input.int(3, "VDO breakout valid N bars", minval = 1, maxval 
 impulseAgeMax = input.int(40, "Impulse zone age limit (bars)", minval = 3, maxval = 100, group = groupSignal)
 requireVdo = input.bool(true, "Require VDO confirmation", group = groupSignal)
 cooldownBars = input.int(20, "Signal cooldown bars", minval = 0, maxval = 100, group = groupSignal)
+
+groupRisk = "TP / SL levels"
+slMode = input.string("Zone edge + buffer", "Stop-loss basis", options = ["Zone edge + buffer", "ATR multiple", "Fixed %"], group = groupRisk)
+slAtrMult = input.float(1.5, "SL ATR multiple (mode: ATR)", minval = 0.2, step = 0.1, group = groupRisk)
+slPct = input.float(0.3, "SL fixed % (mode: Fixed %)", minval = 0.01, step = 0.05, group = groupRisk)
+zoneBufferAtr = input.float(0.15, "Zone-edge buffer / ATR", minval = 0.0, step = 0.05, group = groupRisk)
+tpMode = input.string("R multiple", "Take-profit basis", options = ["R multiple", "Opposite zone", "ATR multiple"], group = groupRisk)
+rrRatio = input.float(2.0, "Reward-to-risk ratio (mode: R multiple)", minval = 0.5, step = 0.25, group = groupRisk)
+tpAtrMult = input.float(3.0, "TP ATR multiple (mode: ATR)", minval = 0.5, step = 0.25, group = groupRisk)
+showTpSlLines = input.bool(true, "Show TP/SL lines on chart", group = groupRisk)
+maxTpSlMarkers = input.int(6, "Max open TP/SL markers", minval = 1, maxval = 20, group = groupRisk)
 
 groupVisuals = "Visuals"
 signalStyle = input.string("Flag", "Signal shape", options = ["Flag", "Arrow", "Label only"], group = groupVisuals)
@@ -138,7 +149,11 @@ if bearishImpulse
 
 // First-touch tracking: boxes are created ONCE at zone birth; later bars only move the right edge / recolor.
 var int lastDemandTouchBar = 0
+var float lastDemandTouchTop = na
+var float lastDemandTouchBottom = na
 var int lastSupplyTouchBar = 0
+var float lastSupplyTouchTop = na
+var float lastSupplyTouchBottom = na
 bool touchDemandThisBar = false
 bool touchSupplyThisBar = false
 
@@ -153,6 +168,8 @@ if array.size(demandTops) > 0
         bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
         if tested and not wasTested
             lastDemandTouchBar := bar_index
+            lastDemandTouchTop := top
+            lastDemandTouchBottom := bottom
             touchDemandThisBar := true
         if tested
             array.set(demandTouched, i, true)
@@ -178,6 +195,8 @@ if array.size(supplyTops) > 0
         bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
         if tested and not wasTested
             lastSupplyTouchBar := bar_index
+            lastSupplyTouchTop := top
+            lastSupplyTouchBottom := bottom
             touchSupplyThisBar := true
         if tested
             array.set(supplyTouched, i, true)
@@ -237,6 +256,105 @@ bool sellSignal = rawSell and not inCooldown
 if buySignal or sellSignal
     lastSignalBar := bar_index
 
+// ────────────────────────── TP / SL levels ──────────────────────────
+// Entry = signal-bar close. SL basis: touched-zone edge + buffer (fallback ATR), ATR multiple, or fixed %.
+// TP basis: R multiple of the risk (default RR 2.0), opposite zone edge, or ATR multiple.
+float slDistAtr = atr * slAtrMult
+float slDistPct = close * slPct / 100.0
+float buyZoneEdgeSl = not na(lastDemandTouchBottom) and bar_index - lastDemandTouchBar <= touchLookback ? close - (lastDemandTouchBottom - atr * zoneBufferAtr) : na
+float sellZoneEdgeSl = not na(lastSupplyTouchTop) and bar_index - lastSupplyTouchBar <= touchLookback ? (lastSupplyTouchTop + atr * zoneBufferAtr) - close : na
+float rawBuySl = slMode == "ATR multiple" ? slDistAtr : slMode == "Fixed %" ? slDistPct : nz(buyZoneEdgeSl, slDistAtr)
+float rawSellSl = slMode == "ATR multiple" ? slDistAtr : slMode == "Fixed %" ? slDistPct : nz(sellZoneEdgeSl, slDistAtr)
+float buySlDist = math.max(0.05 * atr, rawBuySl)
+float sellSlDist = math.max(0.05 * atr, rawSellSl)
+
+// Nearest untouched supply/demand zone edge for the "Opposite zone" TP mode.
+float nearestSupplyTop = na
+if array.size(supplyTops) > 0
+    for i = 0 to array.size(supplyTops) - 1
+        if not array.get(supplyTouched, i)
+            float t = array.get(supplyTops, i)
+            if t > close and (na(nearestSupplyTop) or t < nearestSupplyTop)
+                nearestSupplyTop := t
+float nearestDemandBottom = na
+if array.size(demandTops) > 0
+    for i = 0 to array.size(demandTops) - 1
+        if not array.get(demandTouched, i)
+            float b = array.get(demandBottoms, i)
+            if b < close and (na(nearestDemandBottom) or b > nearestDemandBottom)
+                nearestDemandBottom := b
+
+float rawBuyTp = tpMode == "R multiple" ? buySlDist * rrRatio : tpMode == "ATR multiple" ? atr * tpAtrMult : not na(nearestSupplyTop) ? math.max(atr * 0.5, nearestSupplyTop - close) : buySlDist * rrRatio
+float rawSellTp = tpMode == "R multiple" ? sellSlDist * rrRatio : tpMode == "ATR multiple" ? atr * tpAtrMult : not na(nearestDemandBottom) ? math.max(atr * 0.5, close - nearestDemandBottom) : sellSlDist * rrRatio
+float buyTpDist = math.max(0.1 * atr, rawBuyTp)
+float sellTpDist = math.max(0.1 * atr, rawSellTp)
+
+var float curEntry = na
+var float curSl = na
+var float curTp = na
+var int   curDir = 0
+var int   curSigBar = 0
+var line  tpLine = na
+var line  slLine = na
+var label tpLbl = na
+var label slLbl = na
+
+// Open a fresh TP/SL marker on each new signal (replaces the previous one).
+if buySignal or sellSignal
+    curEntry := close
+    curDir := buySignal ? 1 : -1
+    curSl := buySignal ? close - buySlDist : close + sellSlDist
+    curTp := buySignal ? close + buyTpDist : close - sellTpDist
+    curSigBar := bar_index
+    line.delete(tpLine)
+    line.delete(slLine)
+    label.delete(tpLbl)
+    label.delete(slLbl)
+    if showTpSlLines and not na(curEntry)
+        tpLine := line.new(bar_index, curTp, bar_index + 5, curTp, extend = extend.right, color = color.new(bullColor, 20), style = line.style_solid, width = 2)
+        slLine := line.new(bar_index, curSl, bar_index + 5, curSl, extend = extend.right, color = color.new(bearColor, 20), style = line.style_dashed, width = 2)
+        tpLbl := label.new(bar_index, curTp, "TP " + str.tostring(curTp, format.mintick), style = label.style_none, color = color.new(color.white, 100), textcolor = bullColor, size = size.small)
+        slLbl := label.new(bar_index, curSl, "SL " + str.tostring(curSl, format.mintick), style = label.style_none, color = color.new(color.white, 100), textcolor = bearColor, size = size.small)
+
+// Manage the open position: close on TP/SL hit or on an opposite signal; then fade the markers out.
+bool posOpen = not na(curEntry)
+string exitReason = ""
+if posOpen
+    bool tpHit = curDir == 1 ? high >= curTp : low <= curTp
+    bool slHit = curDir == 1 ? low <= curSl : high >= curSl
+    bool flip = curDir == 1 ? sellSignal : buySignal
+    if tpHit
+        exitReason := "TP"
+    else if slHit
+        exitReason := "SL"
+    else if flip
+        exitReason := "FLIP"
+    if exitReason != ""
+        curEntry := na
+        curSl := na
+        curTp := na
+        curDir := 0
+    else if showTpSlLines
+        if not na(tpLine)
+            line.set_right(tpLine, bar_index + 5)
+        if not na(slLine)
+            line.set_right(slLine, bar_index + 5)
+
+// After exit, keep the lines visible for a few bars, then delete them.
+var int exitFadeBar = 0
+if exitReason != ""
+    exitFadeBar := bar_index
+if showTpSlLines and exitReason == "" and exitFadeBar > 0 and bar_index - exitFadeBar > 8
+    line.delete(tpLine)
+    line.delete(slLine)
+    label.delete(tpLbl)
+    label.delete(slLbl)
+    tpLine := na
+    slLine := na
+    tpLbl := na
+    slLbl := na
+    exitFadeBar := 0
+
 // ────────────────────────── Visuals ──────────────────────────
 // Signals and zone-touch marks drawn via label.new() only: label arguments accept
 // series values, so no const-arg compile errors (CE10123/CE10272) are possible here.
@@ -258,7 +376,7 @@ if touchSupplyThisBar
 
 // ────────────────────────── Status table ──────────────────────────
 cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
-var table panel = table.new(cornerPos, 2, 5, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
+var table panel = table.new(cornerPos, 2, 6, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
 
 string stateTxt = buySignal ? "BUY" : sellSignal ? "SELL" : priceAboveRegme ? "Bullish" : "Bearish"
 color stateCol = buySignal ? bullColor : sellSignal ? bearColor : priceAboveRegme ? color.new(bullColor, 40) : color.new(bearColor, 40)
@@ -274,6 +392,10 @@ if showTable and barstate.islast
     table.cell(panel, 1, 3, freshDemandTouch ? "demand T" : freshSupplyTouch ? "supply T" : "none", text_color = color.white, text_size = size.small)
     table.cell(panel, 0, 4, "VDO", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 4, str.tostring(vdo, "#.#") + (vdoBullBreakout ? "  ^break" : vdoBearBreakout ? "  vbreak" : ""), text_color = vdo >= vdoSignalEma ? bullColor : bearColor, text_size = size.small)
+    string posTxt = posOpen ? (curDir == 1 ? "LONG" : "SHORT") + "  TP " + str.tostring(curTp, format.mintick) + "  SL " + str.tostring(curSl, format.mintick) : exitReason != "" ? "closed: " + exitReason : "flat"
+    color posCol = posOpen ? color.white : exitReason == "TP" ? bullColor : exitReason == "SL" ? bearColor : color.gray
+    table.cell(panel, 0, 5, "Position", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 5, posTxt, text_color = posCol, text_size = size.small)
 
 // ────────────────────────── Alerts ──────────────────────────
 alertcondition(buySignal, "RVP BUY", "BUY signal {{ticker}} {{interval}} price {{close}}")
