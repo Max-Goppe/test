@@ -9,34 +9,37 @@ tfSec = timeframe.in_seconds(timeframe.period)
 bool isM1  = tfSec <= 60
 bool isM5  = tfSec > 60 and tfSec <= 300
 bool isM15 = tfSec > 300 and tfSec <= 900
-bool isH1  = tfSec > 900 and tfSec <= 3600
-int   cfgRegmeLen    = isH1 ? 100 : isM15 ? 55 : isM5 ? 34 : 24
-float cfgVolMult     = isH1 or isM15 ? 1.3 : isM5 ? 1.6 : 1.8
-float cfgMinBodyAtr  = isH1 ? 0.30 : isM15 ? 0.60 : isM5 ? 0.75 : 0.85
-int   cfgVdoBandLen  = isH1 ? 100 : isM15 ? 24 : isM5 ? 50 : 34
+bool isUp  = tfSec > 900
+// Scalping focus: presets tuned for M1/M5/M15 only (backtest on MT5 GOLD 2022-2026).
+// Above M15 the scalping edge disappears, so higher charts fall back to the M15 profile.
+int   cfgRegmeLen    = isM15 or isUp ? 55 : isM5 ? 34 : 24
+float cfgVolMult     = isM15 or isUp ? 2.0 : isM5 ? 2.0 : 1.8
+float cfgMinBodyAtr  = isM15 or isUp ? 0.50 : isM5 ? 0.50 : 0.85
+int   cfgVdoBandLen  = isM15 or isUp ? 24 : isM5 ? 50 : 34
 int   cfgCooldown    = isM1 ? 4 : isM5 ? 6 : 8
 int   cfgMaxZones    = isM1 ? 12 : 16
 int   cfgZoneExtend  = isM1 ? 90 : isM5 ? 120 : 150
 
-groupTf = "Timeframes"
+groupTf = "Timeframes (scalping: M1-M15)"
 entryTfIn   = input.timeframe("", "Entry timeframe (empty = chart)", group = groupTf)
 confirmTfIn = input.timeframe("", "Confirm timeframe (empty = auto x3 of chart)", group = groupTf)
 trendTfIn   = input.timeframe("", "Trend timeframe (empty = auto x9-x12 of chart)", group = groupTf)
 // Auto MTF ladder follows the CHART timeframe: confirm ~x3, trend ~x9-x12.
-cfgConfirmTf = tfSec <= 60 ? "3" : tfSec <= 300 ? "15" : tfSec <= 900 ? "60" : tfSec <= 3600 ? "240" : "D"
-cfgTrendTf   = tfSec <= 60 ? "5" : tfSec <= 300 ? "60" : tfSec <= 900 ? "240" : tfSec <= 3600 ? "D" : "W"
+// Capped at M15: on charts above M15 the ladder stays at 15/60/240.
+cfgConfirmTf = tfSec <= 60 ? "3" : tfSec <= 300 ? "15" : "60"
+cfgTrendTf   = tfSec <= 60 ? "5" : tfSec <= 300 ? "60" : "240"
 entryTf   = entryTfIn
 confirmTf = confirmTfIn != "" ? confirmTfIn : cfgConfirmTf
 trendTf   = trendTfIn != "" ? trendTfIn : cfgTrendTf
 
 groupCore = "REGME core (per TF)"
-regmeLengthIn = input.int(0, "REGME length (0 = auto by chart TF)", minval = 0, group = groupCore, tooltip = "Auto: M1=24, M5=34, M15=55, H1=100")
+regmeLengthIn = input.int(0, "REGME length (0 = auto by chart TF)", minval = 0, group = groupCore, tooltip = "Auto: M1=24, M5=34, M15=55")
 regmeSmooth   = input.int(8, "REGME smoothing", minval = 1, group = groupCore)
 atrLength     = input.int(14, "ATR length", minval = 1, group = groupCore)
 volumeBaseLen = input.int(50, "Volume baseline", minval = 5, group = groupCore)
-volMultEntryIn = input.float(0.0, "Vol multiplier entry TF (0 = auto)", minval = 0.0, step = 0.1, group = groupCore, tooltip = "Auto: H1/M15=1.3, M5=1.6, M1=1.8")
+volMultEntryIn = input.float(0.0, "Vol multiplier entry TF (0 = auto)", minval = 0.0, step = 0.1, group = groupCore, tooltip = "Auto: M5/M15=2.0, M1=1.8. Backtest: vol x1.3 on M5 is pure noise, keep >= 1.6.")
 volMultBig    = input.float(2.0, "Vol multiplier (confirm/trend TF)", minval = 0.5, step = 0.1, group = groupCore)
-minBodyAtrIn = input.float(0.0, "Min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupCore, tooltip = "Auto: H1=0.30, M15=0.60, M5=0.75, M1=0.85")
+minBodyAtrIn = input.float(0.0, "Min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupCore, tooltip = "Auto: M5/M15=0.50, M1=0.85")
 
 groupZones = "Zones (entry TF)"
 showZones = input.bool(true, "Show dynamic zones", group = groupZones)
@@ -45,11 +48,11 @@ zoneExtendIn = input.int(0, "Zone projection bars (0 = auto)", minval = 0, maxva
 touchLookback = input.int(3, "Touch valid N bars", minval = 1, maxval = 10, group = groupZones)
 
 groupSignal = "Scalp signal rules"
-signalMode = input.string("Zone touch or combo", "Entry trigger", options = ["Zone touch only", "Zone touch or combo"], group = groupSignal, tooltip = "Zone touch only = BUY/SELL strictly on first touch of a demand/supply zone (most reliable). Zone touch or combo = also fires when the touch coincides with a VDO breakout/extreme (strongest setups pass too, slightly more signals).")
+signalMode = input.string("Zone touch + VDO (combo)", "Entry trigger", options = ["Zone touch only", "Zone touch + VDO (combo)"], group = groupSignal, tooltip = "Zone touch only = BUY/SELL on first touch of a demand/supply zone. Zone touch + VDO (combo) = touch AND VDO confirmation (breakout/extreme) - backtest: combo is the most reliable mode on M5/M15.")
 requireAllTf = input.bool(true, "Require ALL timeframes aligned", group = groupSignal, tooltip = "Off = allow 2 of 3 TFs to agree.")
 vdoLength = input.int(14, "VDO length", minval = 2, group = groupSignal)
 vdoSigLen = input.int(8, "VDO signal length", minval = 1, group = groupSignal)
-vdoBandLenIn = input.int(0, "VDO band length (0 = auto)", minval = 0, group = groupSignal, tooltip = "Auto: H1=100, M15=24, M5=50, M1=34")
+vdoBandLenIn = input.int(0, "VDO band length (0 = auto)", minval = 0, group = groupSignal, tooltip = "Auto: M15=24, M5=50, M1=34")
 vdoBandMult = input.float(1.35, "VDO band width", minval = 0.5, step = 0.05, group = groupSignal)
 breakoutLookback = input.int(3, "VDO breakout valid N bars", minval = 1, maxval = 10, group = groupSignal)
 cooldownIn = input.int(0, "Signal cooldown bars (0 = auto)", minval = 0, maxval = 30, group = groupSignal, tooltip = "Auto: M1=4, M5=6, others=8")
