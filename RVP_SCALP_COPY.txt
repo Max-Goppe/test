@@ -62,7 +62,7 @@ cooldownIn = input.int(0, "Signal cooldown bars (0 = auto)", minval = 0, maxval 
 
 groupVisuals = "Visuals"
 showTable = input.bool(true, "Show status table", group = groupVisuals)
-tableCorner = input.string("Top right", "Table position", options = ["Top left", "Top right", "Bottom left", "Bottom right"], group = groupVisuals)
+tableCorner = input.string("Верх справа", "Позиция таблицы", options = ["Верх слева", "Верх справа", "Низ слева", "Низ справа"], group = groupVisuals)
 bullColor = input.color(color.rgb(22, 230, 120), "Buy color", group = groupVisuals)
 bearColor = input.color(color.rgb(242, 76, 86), "Sell color", group = groupVisuals)
 
@@ -237,36 +237,49 @@ bool sellSignal = sellSetup and not inCooldown
 if buySignal or sellSignal
     lastSignalBar := bar_index
 
-// ---------- signal labels: plain BUY / SELL plates only ----------
-if buySignal
-    label.new(bar_index, low, "⚑ BUY", style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
-if sellSignal
-    label.new(bar_index, high, "⚑ SELL", style = label.style_label_down, color = bearColor, textcolor = color.black, size = size.normal)
+// ---------- signal labels are OFF by design: all info lives in the Russian table ----------
 
-// ---------- status table ----------
-cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
-var table panel = table.new(cornerPos, 2, 6, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
+// ---------- status table (Russian) ----------
+cornerPos = tableCorner == "Верх слева" ? position.top_left : tableCorner == "Низ слева" ? position.bottom_left : tableCorner == "Низ справа" ? position.bottom_right : position.top_right
+var table panel = table.new(cornerPos, 2, 8, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
 
-string stateTxt = buySignal ? "BUY" : sellSignal ? "SELL" : bullAligned ? "Bullish" : bearAligned ? "Bearish" : "Mixed"
-color stateCol = buySignal ? bullColor : sellSignal ? bearColor : bullAligned ? color.new(bullColor, 40) : bearAligned ? color.new(bearColor, 40) : color.new(color.gray, 30)
+string tfRu(string tf) =>
+    tf == "D" ? "Д1" : tf == "240" ? "4ч" : tf == "60" ? "1ч" : tf == "15" ? "15м" : tf == "5" ? "5м" : tf == "3" ? "3м" : tf == "1" ? "1м" : tf
+
+string sideRu(bool bull, bool bear) => bull ? "растёт" : bear ? "падает" : "флэт"
+
+int zoneAgeD  = lastDemandTouchBar > 0 ? bar_index - lastDemandTouchBar : -1
+int zoneAgeS  = lastSupplyTouchBar > 0 ? bar_index - lastSupplyTouchBar : -1
+string zoneTxt = freshDemandTouch ? "касание зоны спроса (" + str.tostring(zoneAgeD) + " бар. назад)" : freshSupplyTouch ? "касание зоны предложения (" + str.tostring(zoneAgeS) + " бар. назад)" : "касаний зон нет"
+
+bool readyBuy  = bullAligned and priceAboveRegme and freshDemandTouch and buyComboOk
+bool readySell = bearAligned and not priceAboveRegme and freshSupplyTouch and sellComboOk
+string readyTxt = readyBuy ? "ЕСТЬ — лонг по касанию" : readySell ? "ЕСТЬ — шорт по касанию" : bullAligned ? "нет — ждём касания зоны спроса" : bearAligned ? "нет — ждём касания зоны предложения" : "нет — тренды ТФ не согласованы"
+color readyCol = readyBuy ? bullColor : readySell ? bearColor : color.gray
+
+string lookForTxt = bullAligned ? "Смотреть ЛОНГИ от зон спроса" : bearAligned ? "Смотреть ШОРТЫ от зон предложения" : "Нет направления — в сделки не входить"
+color lookForCol = bullAligned ? bullColor : bearAligned ? bearColor : color.gray
+
+string phaseTxt = mtfBull == 3 ? "Сильный бычий тренд" : mtfBear == 3 ? "Сильный медвежий тренд" : mtfBull == 2 ? "Бычий тренд" : mtfBear == 2 ? "Медвежий тренд" : mtfBull == 1 ? "Слабо бычий (сомнительно)" : mtfBear == 1 ? "Слабо медвежий (сомнительно)" : "Флэт / разнобой"
+color phaseCol = mtfBull > mtfBear ? bullColor : mtfBear > mtfBull ? bearColor : color.gray
 
 if showTable and barstate.islast
-    table.cell(panel, 0, 0, "STATE", text_color = stateCol, text_size = size.large)
-    table.cell(panel, 1, 0, stateTxt, text_color = stateCol, text_size = size.large)
-    table.cell(panel, 0, 1, "Trend MTF", text_color = color.silver, text_size = size.small)
-    string trendWord = mtfBull == 3 ? "Strong bullish" : mtfBear == 3 ? "Strong bearish" : mtfBull == 2 ? "Bullish" : mtfBear == 2 ? "Bearish" : mtfBull == 1 ? "Weak bullish" : mtfBear == 1 ? "Weak bearish" : "Flat"
-    table.cell(panel, 1, 1, trendWord, text_color = mtfBull > mtfBear ? bullColor : mtfBear > mtfBull ? bearColor : color.gray, text_size = size.small)
-    table.cell(panel, 0, 2, "Structure (chart/" + confirmTf + "/" + trendTf + ")", text_color = color.silver, text_size = size.small)
-    string chartWord = eStrBullE ? "up" : eStrBearE ? "down" : "flat"
-    string confirmWord = cStrBullC ? "up" : cStrBearC ? "down" : "flat"
-    string trendSideWord = tStrBullT ? "up" : tStrBearT ? "down" : "flat"
-    table.cell(panel, 1, 2, chartWord + " / " + confirmWord + " / " + trendSideWord, text_color = priceAboveRegme ? bullColor : bearColor, text_size = size.small)
-    table.cell(panel, 0, 3, "Momentum", text_color = color.silver, text_size = size.small)
-    table.cell(panel, 1, 3, eMomBullE or cMomBullC or tMomBullT ? "bull impulse" : eMomBearE or cMomBearC or tMomBearT ? "bear impulse" : "quiet", text_color = color.white, text_size = size.small)
-    table.cell(panel, 0, 4, "Volume (entry TF)", text_color = color.silver, text_size = size.small)
-    table.cell(panel, 1, 4, volumeImpulse ? "impulse x" + str.tostring(vol / volBase, "#.#") : "normal", text_color = volumeImpulse ? color.yellow : color.gray, text_size = size.small)
-    table.cell(panel, 0, 5, "Zone / VDO", text_color = color.silver, text_size = size.small)
-    table.cell(panel, 1, 5, (freshDemandTouch ? "demand T" : freshSupplyTouch ? "supply T" : "no touch") + " | VDO " + str.tostring(vdo, "#.#") + (vdoBullBreakout ? " ^brk" : vdoBearBreakout ? " vbrk" : ""), text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 0, "СИГНАЛ", text_color = bullColor, text_size = size.large)
+    table.cell(panel, 1, 0, buySignal ? "ПОКУПКА" : sellSignal ? "ПРОДАЖА" : "— нет —", text_color = buySignal ? bullColor : sellSignal ? bearColor : color.gray, text_size = size.large)
+    table.cell(panel, 0, 1, "Фаза рынка", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 1, phaseTxt, text_color = phaseCol, text_size = size.small)
+    table.cell(panel, 0, 2, "Тренды ТФ", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 2, tfRu(timeframe.period) + ": " + sideRu(eStrBullE, eStrBearE) + " | " + tfRu(confirmTf) + ": " + sideRu(cStrBullC, cStrBearC) + " | " + tfRu(trendTf) + ": " + sideRu(tStrBullT, tStrBearT), text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 3, "Куда смотреть", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 3, lookForTxt, text_color = lookForCol, text_size = size.small)
+    table.cell(panel, 0, 4, "Импульс (движение)", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 4, eMomBullE or cMomBullC or tMomBullT ? "бычий импульс" : eMomBearE or cMomBearC or tMomBearT ? "медвежий импульс" : "спокойно", text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 5, "Объём (вход. ТФ)", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 5, volumeImpulse ? "всплеск x" + str.tostring(vol / volBase, "#.#") : "обычный", text_color = volumeImpulse ? color.yellow : color.gray, text_size = size.small)
+    table.cell(panel, 0, 6, "Зоны входа", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 6, zoneTxt + " | VDO " + str.tostring(vdo, "#.#"), text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 7, "Готовность", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 7, readyTxt, text_color = readyCol, text_size = size.small)
 
 alertcondition(buySignal, "SCALP BUY", "Scalp BUY {{ticker}} {{interval}} price {{close}}")
 alertcondition(sellSignal, "SCALP SELL", "Scalp SELL {{ticker}} {{interval}} price {{close}}")
