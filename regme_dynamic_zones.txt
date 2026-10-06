@@ -1,5 +1,5 @@
 //@version=6
-indicator("INV REGME Dynamic Zones", "REGME", overlay = true, max_boxes_count = 160, max_labels_count = 50, precision = 2)
+indicator("REGME Dynamic Zones", "REGME", overlay = true, max_boxes_count = 160, max_labels_count = 50, precision = 2)
 
 // Functional reconstruction from screenshots, not the private author's formula.
 // Timeframe presets tuned on MT5 GOLD M5 export (2022-2026): best zone-touch reaction on H1.

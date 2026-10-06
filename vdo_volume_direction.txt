@@ -1,5 +1,5 @@
 //@version=6
-indicator("INV VDO Volume Direction", "VDO", overlay = false, precision = 1)
+indicator("VDO Volume Direction", "VDO", overlay = false, precision = 1)
 
 // Functional reconstruction from screenshots, not the private author's formula.
 // Timeframe presets tuned on MT5 GOLD M5 export (2022-2026): mean-reversion signals are
