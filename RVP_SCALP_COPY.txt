@@ -1,0 +1,263 @@
+//@version=6
+// RVP SCALP - multitimeframe scalping indicator for XAUUSD (tuned on MT5 GOLD M5 export 2022-2026).
+// Trend line + MTF confluence table + scalp BUY/SELL signals (no TP/SL - exit management is manual).
+indicator("RVP SCALP", "RVP SCALP", overlay = true, max_labels_count = 50, max_boxes_count = 50, precision = 2)
+
+// --- Auto presets: settings follow the CHART timeframe (timeframe.period), not an input.
+// Tuned on MT5 GOLD M5 export 2022-2026 (entry TF = chart TF; confirm = x3; trend = x9..x12).
+tfSec = timeframe.in_seconds(timeframe.period)
+bool isM1  = tfSec <= 60
+bool isM5  = tfSec > 60 and tfSec <= 300
+bool isM15 = tfSec > 300 and tfSec <= 900
+bool isUp  = tfSec > 900
+// Scalping focus: presets tuned for M1/M5/M15 only (backtest on MT5 GOLD 2022-2026).
+// Above M15 the scalping edge disappears, so higher charts fall back to the M15 profile.
+int   cfgRegmeLen    = isM15 or isUp ? 55 : isM5 ? 34 : 24
+float cfgVolMult     = isM15 or isUp ? 2.0 : isM5 ? 2.0 : 1.8
+float cfgMinBodyAtr  = isM15 or isUp ? 0.50 : isM5 ? 0.50 : 0.85
+int   cfgVdoBandLen  = isM15 or isUp ? 24 : isM5 ? 50 : 34
+int   cfgCooldown    = isM1 ? 4 : isM5 ? 6 : 8
+int   cfgMaxZones    = isM1 ? 12 : 16
+int   cfgZoneExtend  = isM1 ? 90 : isM5 ? 120 : 150
+
+groupTf = "Timeframes (scalping: M1-M15)"
+entryTfIn   = input.timeframe("", "Entry timeframe (empty = chart)", group = groupTf)
+confirmTfIn = input.timeframe("", "Confirm timeframe (empty = auto x3 of chart)", group = groupTf)
+trendTfIn   = input.timeframe("", "Trend timeframe (empty = auto x9-x12 of chart)", group = groupTf)
+// Auto MTF ladder follows the CHART timeframe: confirm ~x3, trend ~x9-x12.
+// Capped at M15: on charts above M15 the ladder stays at 15/60/240.
+cfgConfirmTf = tfSec <= 60 ? "3" : tfSec <= 300 ? "15" : "60"
+cfgTrendTf   = tfSec <= 60 ? "5" : tfSec <= 300 ? "60" : "240"
+entryTf   = entryTfIn
+confirmTf = confirmTfIn != "" ? confirmTfIn : cfgConfirmTf
+trendTf   = trendTfIn != "" ? trendTfIn : cfgTrendTf
+
+groupCore = "REGME core (per TF)"
+regmeLengthIn = input.int(0, "REGME length (0 = auto by chart TF)", minval = 0, group = groupCore, tooltip = "Auto: M1=24, M5=34, M15=55")
+regmeSmooth   = input.int(8, "REGME smoothing", minval = 1, group = groupCore)
+atrLength     = input.int(14, "ATR length", minval = 1, group = groupCore)
+volumeBaseLen = input.int(50, "Volume baseline", minval = 5, group = groupCore)
+volMultEntryIn = input.float(0.0, "Vol multiplier entry TF (0 = auto)", minval = 0.0, step = 0.1, group = groupCore, tooltip = "Auto: M5/M15=2.0, M1=1.8. Backtest: vol x1.3 on M5 is pure noise, keep >= 1.6.")
+volMultBig    = input.float(2.0, "Vol multiplier (confirm/trend TF)", minval = 0.5, step = 0.1, group = groupCore)
+minBodyAtrIn = input.float(0.0, "Min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupCore, tooltip = "Auto: M5/M15=0.50, M1=0.85")
+
+groupZones = "Zones (entry TF)"
+showZones = input.bool(true, "Show dynamic zones", group = groupZones)
+maxZonesIn = input.int(0, "Max zones per side (0 = auto)", minval = 0, maxval = 20, group = groupZones, tooltip = "Auto: M1=12, others=16")
+zoneExtendIn = input.int(0, "Zone projection bars (0 = auto)", minval = 0, maxval = 300, group = groupZones, tooltip = "Auto: M1=90, M5=120, others=150")
+touchLookback = input.int(3, "Touch valid N bars", minval = 1, maxval = 10, group = groupZones)
+
+groupSignal = "Scalp signal rules"
+signalMode = input.string("Zone touch + VDO (combo)", "Entry trigger", options = ["Zone touch only", "Zone touch + VDO (combo)"], group = groupSignal, tooltip = "Zone touch only = BUY/SELL on first touch of a demand/supply zone. Zone touch + VDO (combo) = touch AND VDO confirmation (breakout/extreme) - backtest: combo is the most reliable mode on M5/M15.")
+requireAllTf = input.bool(true, "Require ALL timeframes aligned", group = groupSignal, tooltip = "Off = allow 2 of 3 TFs to agree.")
+vdoLength = input.int(14, "VDO length", minval = 2, group = groupSignal)
+vdoSigLen = input.int(8, "VDO signal length", minval = 1, group = groupSignal)
+vdoBandLenIn = input.int(0, "VDO band length (0 = auto)", minval = 0, group = groupSignal, tooltip = "Auto: M15=24, M5=50, M1=34")
+vdoBandMult = input.float(1.35, "VDO band width", minval = 0.5, step = 0.05, group = groupSignal)
+breakoutLookback = input.int(3, "VDO breakout valid N bars", minval = 1, maxval = 10, group = groupSignal)
+cooldownIn = input.int(0, "Signal cooldown bars (0 = auto)", minval = 0, maxval = 30, group = groupSignal, tooltip = "Auto: M1=4, M5=6, others=8")
+
+groupVisuals = "Visuals"
+showTable = input.bool(true, "Show status table", group = groupVisuals)
+tableCorner = input.string("Top right", "Table position", options = ["Top left", "Top right", "Bottom left", "Bottom right"], group = groupVisuals)
+bullColor = input.color(color.rgb(22, 230, 120), "Buy color", group = groupVisuals)
+bearColor = input.color(color.rgb(242, 76, 86), "Sell color", group = groupVisuals)
+
+// ---------- generic per-TF state via request.security ----------
+// NOTE: security() expression must NOT contain local vars; only Pine builtins + global inputs.
+// Effective values: override if > 0, else auto-by-chart-timeframe.
+regmeLength    = regmeLengthIn > 0 ? regmeLengthIn : cfgRegmeLen
+volMultEntry   = volMultEntryIn > 0 ? volMultEntryIn : cfgVolMult
+minBodyAtr     = minBodyAtrIn > 0 ? minBodyAtrIn : cfgMinBodyAtr
+vdoBandLen     = vdoBandLenIn > 0 ? vdoBandLenIn : cfgVdoBandLen
+maxZones       = maxZonesIn > 0 ? maxZonesIn : cfgMaxZones
+zoneExtendBars = zoneExtendIn > 0 ? zoneExtendIn : cfgZoneExtend
+cooldownBars   = cooldownIn > 0 ? cooldownIn : cfgCooldown
+
+[eStrBullE, eStrBearE] = request.security(syminfo.tickerid, entryTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
+[cStrBullC, cStrBearC] = request.security(syminfo.tickerid, confirmTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
+[tStrBullT, tStrBearT] = request.security(syminfo.tickerid, trendTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
+
+[eMomBullE, eMomBearE] = request.security(syminfo.tickerid, entryTf, [math.abs(close - open) >= ta.atr(atrLength) * minBodyAtr and close > open and volume > ta.sma(nz(volume, 0.0), volumeBaseLen) * volMultEntry, math.abs(close - open) >= ta.atr(atrLength) * minBodyAtr and close < open and volume > ta.sma(nz(volume, 0.0), volumeBaseLen) * volMultEntry], lookahead = barmerge.lookahead_off)
+[cMomBullC, cMomBearC] = request.security(syminfo.tickerid, confirmTf, [math.abs(close - open) >= ta.atr(atrLength) * minBodyAtr and close > open and volume > ta.sma(nz(volume, 0.0), volumeBaseLen) * volMultBig, math.abs(close - open) >= ta.atr(atrLength) * minBodyAtr and close < open and volume > ta.sma(nz(volume, 0.0), volumeBaseLen) * volMultBig], lookahead = barmerge.lookahead_off)
+[tMomBullT, tMomBearT] = request.security(syminfo.tickerid, trendTf, [math.abs(close - open) >= ta.atr(atrLength) * minBodyAtr and close > open and volume > ta.sma(nz(volume, 0.0), volumeBaseLen) * volMultBig, math.abs(close - open) >= ta.atr(atrLength) * minBodyAtr and close < open and volume > ta.sma(nz(volume, 0.0), volumeBaseLen) * volMultBig], lookahead = barmerge.lookahead_off)
+
+int mtfBull = (eStrBullE ? 1 : 0) + (cStrBullC ? 1 : 0) + (tStrBullT ? 1 : 0)
+int mtfBear = (eStrBearE ? 1 : 0) + (cStrBearC ? 1 : 0) + (tStrBearT ? 1 : 0)
+bool bullAligned = requireAllTf ? mtfBull == 3 : mtfBull >= 2
+bool bearAligned = requireAllTf ? mtfBear == 3 : mtfBear >= 2
+
+// ---------- entry-TF native calcs (line, zones, VDO) ----------
+float vol = nz(volume, 0.0)
+float atr = ta.atr(atrLength)
+float vwmaPrice = ta.vwma(hlc3, regmeLength)
+float regme = ta.ema(vwmaPrice, regmeSmooth)
+bool priceAboveRegme = close >= regme
+plot(regme, "REGME trend", color = priceAboveRegme ? bullColor : bearColor, linewidth = 4)
+
+float volBase = ta.sma(vol, volumeBaseLen)
+bool volumeImpulse = volBase > 0 and vol > volBase * volMultEntry
+bool rangeImpulse = atr > 0 and math.abs(close - open) >= atr * minBodyAtr and (high - low) >= atr * 0.9
+
+bool bullishImpulse = showZones and volumeImpulse and rangeImpulse and close > open and close > regme
+bool bearishImpulse = showZones and volumeImpulse and rangeImpulse and close < open and close < regme
+
+var array<float> demandTops = array.new<float>()
+var array<float> demandBottoms = array.new<float>()
+var array<int>   demandBirth = array.new<int>()
+var array<bool>  demandTouched = array.new<bool>()
+var array<box>   demandBoxes = array.new<box>()
+var array<float> supplyTops = array.new<float>()
+var array<float> supplyBottoms = array.new<float>()
+var array<int>   supplyBirth = array.new<int>()
+var array<bool>  supplyTouched = array.new<bool>()
+var array<box>   supplyBoxes = array.new<box>()
+
+if bullishImpulse
+    float zTop = math.min(open, close)
+    array.push(demandTops, zTop)
+    array.push(demandBottoms, low)
+    array.push(demandBirth, bar_index)
+    array.push(demandTouched, false)
+    box dBoxNew = showZones ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 45), bgcolor = color.new(bullColor, 87), border_width = 1) : na
+    array.push(demandBoxes, dBoxNew)
+    if array.size(demandTops) > maxZones
+        box.delete(array.shift(demandBoxes))
+        array.shift(demandTops)
+        array.shift(demandBottoms)
+        array.shift(demandBirth)
+        array.shift(demandTouched)
+
+if bearishImpulse
+    float zBottom = math.max(open, close)
+    array.push(supplyTops, high)
+    array.push(supplyBottoms, zBottom)
+    array.push(supplyBirth, bar_index)
+    array.push(supplyTouched, false)
+    box sBoxNew = showZones ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 45), bgcolor = color.new(bearColor, 87), border_width = 1) : na
+    array.push(supplyBoxes, sBoxNew)
+    if array.size(supplyTops) > maxZones
+        box.delete(array.shift(supplyBoxes))
+        array.shift(supplyTops)
+        array.shift(supplyBottoms)
+        array.shift(supplyBirth)
+        array.shift(supplyTouched)
+
+var int lastDemandTouchBar = 0
+var int lastSupplyTouchBar = 0
+bool touchDemandThisBar = false
+bool touchSupplyThisBar = false
+
+if array.size(demandTops) > 0
+    for i = 0 to array.size(demandTops) - 1
+        float top = array.get(demandTops, i)
+        float bottom = array.get(demandBottoms, i)
+        int birth = array.get(demandBirth, i)
+        bool wasTested = array.get(demandTouched, i)
+        bool broken = close < bottom
+        bool inZone = low <= top and high >= bottom
+        bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
+        if tested and not wasTested
+            lastDemandTouchBar := bar_index
+            touchDemandThisBar := true
+        if tested
+            array.set(demandTouched, i, true)
+        box dB = array.get(demandBoxes, i)
+        if showZones and not na(dB)
+            if broken
+                box.delete(dB)
+                array.set(demandBoxes, i, na)
+            else if tested
+                box.set_bgcolor(dB, color.new(bullColor, 79))
+                box.set_border_color(dB, color.new(bullColor, 15))
+
+if array.size(supplyTops) > 0
+    for i = 0 to array.size(supplyTops) - 1
+        float top = array.get(supplyTops, i)
+        float bottom = array.get(supplyBottoms, i)
+        int birth = array.get(supplyBirth, i)
+        bool wasTested = array.get(supplyTouched, i)
+        bool broken = close > top
+        bool inZone = high >= bottom and low <= top
+        bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
+        if tested and not wasTested
+            lastSupplyTouchBar := bar_index
+            touchSupplyThisBar := true
+        if tested
+            array.set(supplyTouched, i, true)
+        box sB = array.get(supplyBoxes, i)
+        if showZones and not na(sB)
+            if broken
+                box.delete(sB)
+                array.set(supplyBoxes, i, na)
+            else if tested
+                box.set_bgcolor(sB, color.new(bearColor, 79))
+                box.set_border_color(sB, color.new(bearColor, 15))
+
+bool freshDemandTouch = lastDemandTouchBar > 0 and bar_index - lastDemandTouchBar <= touchLookback
+bool freshSupplyTouch = lastSupplyTouchBar > 0 and bar_index - lastSupplyTouchBar <= touchLookback
+
+// ---------- VDO on entry TF ----------
+float signedVolume = close > close[1] ? vol : close < close[1] ? -vol : 0.0
+float totalVolume = ta.ema(vol, vdoLength)
+float volumePosition = ta.ema(signedVolume, vdoLength)
+float vzo = totalVolume != 0.0 ? 100.0 * volumePosition / totalVolume : 0.0
+float vdo = math.max(0.0, math.min(100.0, 50.0 + vzo * 0.5))
+float vdoSignalEma = ta.ema(vdo, vdoSigLen)
+float vdoDev = ta.stdev(vdo, vdoBandLen)
+float upperBand = math.min(80.0, vdoSignalEma + vdoDev * vdoBandMult)
+float lowerBand = math.max(20.0, vdoSignalEma - vdoDev * vdoBandMult)
+
+int vdoBullBars = ta.barssince(ta.crossover(vdo, upperBand))
+int vdoBearBars = ta.barssince(ta.crossunder(vdo, lowerBand))
+bool vdoBullBreakout = not na(vdoBullBars) and vdoBullBars <= breakoutLookback and vdo > vdoSignalEma
+bool vdoBearBreakout = not na(vdoBearBars) and vdoBearBars <= breakoutLookback and vdo < vdoSignalEma
+// Combo confirmation: VDO breakout/extreme aligned with the same direction as the zone touch.
+bool vdoOversold = vdo < 30
+bool vdoOverbought = vdo > 70
+
+// ---------- scalp signals: all-TF alignment + fresh zone touch (mandatory) ----------
+// "Zone touch only": fires strictly on first touch of a demand/supply zone.
+// "Zone touch or combo": still requires the touch, but skips setups NOT confirmed by VDO
+// (i.e. touch alone passes in both modes; combo mode is stricter: touch AND VDO agree).
+bool buyComboOk  = signalMode == "Zone touch only" ? true : (vdoBullBreakout or vdoOversold or vdo > vdoSignalEma)
+bool sellComboOk = signalMode == "Zone touch only" ? true : (vdoBearBreakout or vdoOverbought or vdo < vdoSignalEma)
+bool buySetup  = bullAligned and priceAboveRegme and freshDemandTouch and buyComboOk
+bool sellSetup = bearAligned and not priceAboveRegme and freshSupplyTouch and sellComboOk
+
+var int lastSignalBar = 0
+bool inCooldown = lastSignalBar > 0 and bar_index - lastSignalBar <= cooldownBars
+bool buySignal = buySetup and not inCooldown
+bool sellSignal = sellSetup and not inCooldown
+if buySignal or sellSignal
+    lastSignalBar := bar_index
+
+// ---------- signal labels: plain BUY / SELL plates only ----------
+if buySignal
+    label.new(bar_index, low, "⚑ BUY", style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
+if sellSignal
+    label.new(bar_index, high, "⚑ SELL", style = label.style_label_down, color = bearColor, textcolor = color.black, size = size.normal)
+
+// ---------- status table ----------
+cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
+var table panel = table.new(cornerPos, 2, 6, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
+
+string stateTxt = buySignal ? "BUY" : sellSignal ? "SELL" : bullAligned ? "Bullish" : bearAligned ? "Bearish" : "Mixed"
+color stateCol = buySignal ? bullColor : sellSignal ? bearColor : bullAligned ? color.new(bullColor, 40) : bearAligned ? color.new(bearColor, 40) : color.new(color.gray, 30)
+
+if showTable and barstate.islast
+    table.cell(panel, 0, 0, "STATE", text_color = stateCol, text_size = size.large)
+    table.cell(panel, 1, 0, stateTxt, text_color = stateCol, text_size = size.large)
+    table.cell(panel, 0, 1, "Trend MTF", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 1, str.tostring(mtfBull) + "▲ / " + str.tostring(mtfBear) + "▼", text_color = mtfBull > mtfBear ? bullColor : mtfBear > mtfBull ? bearColor : color.gray, text_size = size.small)
+    table.cell(panel, 0, 2, "Structure (chart/" + confirmTf + "/" + trendTf + ")", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 2, (eStrBullE ? "▲" : eStrBearE ? "▼" : "–") + (cStrBullC ? "▲" : cStrBearC ? "▼" : "–") + (tStrBullT ? "▲" : tStrBearT ? "▼" : "–"), text_color = priceAboveRegme ? bullColor : bearColor, text_size = size.small)
+    table.cell(panel, 0, 3, "Momentum", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 3, eMomBullE or cMomBullC or tMomBullT ? "bull impulse" : eMomBearE or cMomBearC or tMomBearT ? "bear impulse" : "quiet", text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 4, "Volume (entry TF)", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 4, volumeImpulse ? "impulse x" + str.tostring(vol / volBase, "#.#") : "normal", text_color = volumeImpulse ? color.yellow : color.gray, text_size = size.small)
+    table.cell(panel, 0, 5, "Zone / VDO", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 5, (freshDemandTouch ? "demand T" : freshSupplyTouch ? "supply T" : "no touch") + " | VDO " + str.tostring(vdo, "#.#") + (vdoBullBreakout ? " ^brk" : vdoBearBreakout ? " vbrk" : ""), text_color = color.white, text_size = size.small)
+
+alertcondition(buySignal, "SCALP BUY", "Scalp BUY {{ticker}} {{interval}} price {{close}}")
+alertcondition(sellSignal, "SCALP SELL", "Scalp SELL {{ticker}} {{interval}} price {{close}}")
