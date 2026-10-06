@@ -45,6 +45,7 @@ zoneExtendIn = input.int(0, "Zone projection bars (0 = auto)", minval = 0, maxva
 touchLookback = input.int(3, "Touch valid N bars", minval = 1, maxval = 10, group = groupZones)
 
 groupSignal = "Scalp signal rules"
+signalMode = input.string("Zone touch or combo", "Entry trigger", options = ["Zone touch only", "Zone touch or combo"], group = groupSignal, tooltip = "Zone touch only = BUY/SELL strictly on first touch of a demand/supply zone (most reliable). Zone touch or combo = also fires when the touch coincides with a VDO breakout/extreme (strongest setups pass too, slightly more signals).")
 requireAllTf = input.bool(true, "Require ALL timeframes aligned", group = groupSignal, tooltip = "Off = allow 2 of 3 TFs to agree.")
 vdoLength = input.int(14, "VDO length", minval = 2, group = groupSignal)
 vdoSigLen = input.int(8, "VDO signal length", minval = 1, group = groupSignal)
@@ -208,13 +209,18 @@ int vdoBullBars = ta.barssince(ta.crossover(vdo, upperBand))
 int vdoBearBars = ta.barssince(ta.crossunder(vdo, lowerBand))
 bool vdoBullBreakout = not na(vdoBullBars) and vdoBullBars <= breakoutLookback and vdo > vdoSignalEma
 bool vdoBearBreakout = not na(vdoBearBars) and vdoBearBars <= breakoutLookback and vdo < vdoSignalEma
-// pullback trigger: VDO dips into oversold / overbought extremes while the trend is up/down
+// Combo confirmation: VDO breakout/extreme aligned with the same direction as the zone touch.
 bool vdoOversold = vdo < 30
 bool vdoOverbought = vdo > 70
 
-// ---------- scalp signals: all-TF alignment + (fresh zone touch OR VDO extreme/breakout) ----------
-bool buySetup  = bullAligned and priceAboveRegme and (freshDemandTouch or vdoOversold or vdoBullBreakout)
-bool sellSetup = bearAligned and not priceAboveRegme and (freshSupplyTouch or vdoOverbought or vdoBearBreakout)
+// ---------- scalp signals: all-TF alignment + fresh zone touch (mandatory) ----------
+// "Zone touch only": fires strictly on first touch of a demand/supply zone.
+// "Zone touch or combo": still requires the touch, but skips setups NOT confirmed by VDO
+// (i.e. touch alone passes in both modes; combo mode is stricter: touch AND VDO agree).
+bool buyComboOk  = signalMode == "Zone touch only" ? true : (vdoBullBreakout or vdoOversold or vdo > vdoSignalEma)
+bool sellComboOk = signalMode == "Zone touch only" ? true : (vdoBearBreakout or vdoOverbought or vdo < vdoSignalEma)
+bool buySetup  = bullAligned and priceAboveRegme and freshDemandTouch and buyComboOk
+bool sellSetup = bearAligned and not priceAboveRegme and freshSupplyTouch and sellComboOk
 
 var int lastSignalBar = 0
 bool inCooldown = lastSignalBar > 0 and bar_index - lastSignalBar <= cooldownBars
@@ -223,15 +229,11 @@ bool sellSignal = sellSetup and not inCooldown
 if buySignal or sellSignal
     lastSignalBar := bar_index
 
-// Trigger reason for the current signal (shown inside the BUY/SELL plate itself).
-string buyTrigger = freshDemandTouch ? "zone T" : vdoBullBreakout ? "VDO brk" : "VDO os"
-string sellTrigger = freshSupplyTouch ? "zone T" : vdoBearBreakout ? "VDO brk" : "VDO ob"
-
-// ---------- signal labels (all info folded into the BUY/SELL plates; no standalone "T" marks) ----------
+// ---------- signal labels: plain BUY / SELL plates only ----------
 if buySignal
-    label.new(bar_index, low, "⚑ BUY\n" + buyTrigger, style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
+    label.new(bar_index, low, "⚑ BUY", style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
 if sellSignal
-    label.new(bar_index, high, "⚑ SELL\n" + sellTrigger, style = label.style_label_down, color = bearColor, textcolor = color.black, size = size.normal)
+    label.new(bar_index, high, "⚑ SELL", style = label.style_label_down, color = bearColor, textcolor = color.black, size = size.normal)
 
 // ---------- status table ----------
 cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
