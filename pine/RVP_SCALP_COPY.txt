@@ -3,19 +3,39 @@
 // Trend line + MTF confluence table + scalp BUY/SELL signals with TP/SL lines.
 indicator("RVP SCALP", "RVP SCALP", overlay = true, max_labels_count = 50, max_boxes_count = 50, precision = 2)
 
+// --- Auto presets: settings follow the CHART timeframe (timeframe.period), not an input.
+// Tuned on MT5 GOLD M5 export 2022-2026 (entry TF = chart TF; confirm = x3; trend = x9..x12).
+tfSec = timeframe.in_seconds(timeframe.period)
+bool isM1  = tfSec <= 60
+bool isM5  = tfSec > 60 and tfSec <= 300
+bool isM15 = tfSec > 300 and tfSec <= 900
+bool isH1  = tfSec > 900 and tfSec <= 3600
+int   cfgRegmeLen    = isH1 ? 100 : isM15 ? 55 : 34
+float cfgVolMult     = isH1 ? 1.3 : isM15 ? 1.3 : 1.6
+float cfgMinBodyAtr  = isH1 ? 0.30 : isM15 ? 0.60 : 0.75
+int   cfgVdoBandLen  = isH1 ? 100 : isM15 ? 24 : 50
+float cfgTpRR        = isH1 ? 2.0 : isM15 ? 1.5 : 1.0
+float cfgSlAtr       = 2.0
+
 groupTf = "Timeframes"
-entryTf   = input.timeframe("", "Entry timeframe (empty = chart)", group = groupTf)
-confirmTf = input.timeframe("15", "Confirm timeframe", group = groupTf)
-trendTf   = input.timeframe("60", "Trend timeframe", group = groupTf)
+entryTfIn   = input.timeframe("", "Entry timeframe (empty = chart)", group = groupTf)
+confirmTfIn = input.timeframe("", "Confirm timeframe (empty = auto x3 of chart)", group = groupTf)
+trendTfIn   = input.timeframe("", "Trend timeframe (empty = auto x9-x12 of chart)", group = groupTf)
+// Auto MTF ladder follows the CHART timeframe: confirm ~x3, trend ~x9-x12.
+cfgConfirmTf = tfSec <= 60 ? "3" : tfSec <= 300 ? "15" : tfSec <= 900 ? "60" : tfSec <= 3600 ? "240" : "D"
+cfgTrendTf   = tfSec <= 60 ? "9" : tfSec <= 300 ? "60" : tfSec <= 900 ? "240" : tfSec <= 3600 ? "D" : "W"
+entryTf   = entryTfIn
+confirmTf = confirmTfIn != "" ? confirmTfIn : cfgConfirmTf
+trendTf   = trendTfIn != "" ? trendTfIn : cfgTrendTf
 
 groupCore = "REGME core (per TF)"
-regmeLength   = input.int(55, "REGME length", minval = 5, group = groupCore)
+regmeLengthIn = input.int(0, "REGME length (0 = auto by chart TF)", minval = 0, group = groupCore, tooltip = "Auto: M1/M5=34, M15=55, H1=100")
 regmeSmooth   = input.int(8, "REGME smoothing", minval = 1, group = groupCore)
 atrLength     = input.int(14, "ATR length", minval = 1, group = groupCore)
 volumeBaseLen = input.int(50, "Volume baseline", minval = 5, group = groupCore)
-volMultEntry  = input.float(1.6, "Vol multiplier (entry TF)", minval = 0.5, step = 0.1, group = groupCore)
+volMultEntryIn = input.float(0.0, "Vol multiplier entry TF (0 = auto)", minval = 0.0, step = 0.1, group = groupCore, tooltip = "Auto: H1/M15=1.3, M5=1.6")
 volMultBig    = input.float(2.0, "Vol multiplier (confirm/trend TF)", minval = 0.5, step = 0.1, group = groupCore)
-minBodyAtr    = input.float(0.55, "Min body / ATR", minval = 0.0, step = 0.05, group = groupCore)
+minBodyAtrIn = input.float(0.0, "Min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupCore, tooltip = "Auto: H1=0.30, M15=0.60, M5=0.75")
 
 groupZones = "Zones (entry TF)"
 showZones = input.bool(true, "Show dynamic zones", group = groupZones)
@@ -27,18 +47,18 @@ groupSignal = "Scalp signal rules"
 requireAllTf = input.bool(true, "Require ALL timeframes aligned", group = groupSignal, tooltip = "Off = allow 2 of 3 TFs to agree.")
 vdoLength = input.int(14, "VDO length", minval = 2, group = groupSignal)
 vdoSigLen = input.int(8, "VDO signal length", minval = 1, group = groupSignal)
-vdoBandLen = input.int(50, "VDO band length", minval = 5, group = groupSignal)
+vdoBandLenIn = input.int(0, "VDO band length (0 = auto)", minval = 0, group = groupSignal, tooltip = "Auto: H1=100, M15=24, M5=50")
 vdoBandMult = input.float(1.35, "VDO band width", minval = 0.5, step = 0.05, group = groupSignal)
 breakoutLookback = input.int(3, "VDO breakout valid N bars", minval = 1, maxval = 10, group = groupSignal)
 cooldownBars = input.int(6, "Signal cooldown bars", minval = 1, maxval = 30, group = groupSignal)
 
 groupTpSl = "TP / SL levels"
 slMode = input.string("Zone edge + buffer", "Stop-loss basis", options = ["Zone edge + buffer", "ATR multiple", "Fixed %"], group = groupTpSl)
-slAtrMult = input.float(1.5, "SL ATR multiple", minval = 0.3, step = 0.1, group = groupTpSl)
+slAtrMultIn = input.float(0.0, "SL ATR multiple (0 = auto)", minval = 0.0, step = 0.1, group = groupTpSl, tooltip = "Auto: 2.0 (best across all TFs)")
 slPct = input.float(0.3, "SL fixed %", minval = 0.05, step = 0.05, group = groupTpSl)
 slBufferAtr = input.float(0.15, "Zone-edge buffer (ATR)", minval = 0.0, step = 0.05, group = groupTpSl)
 tpMode = input.string("R multiple", "Take-profit basis", options = ["R multiple", "ATR multiple"], group = groupTpSl)
-tpRR = input.float(2.0, "TP R-multiple", minval = 0.5, step = 0.25, group = groupTpSl)
+tpRRIn = input.float(0.0, "TP R-multiple (0 = auto)", minval = 0.0, step = 0.25, group = groupTpSl, tooltip = "Auto: H1=2.0, M15=1.5, M5=1.0")
 tpAtrMult = input.float(3.0, "TP ATR multiple", minval = 0.5, step = 0.25, group = groupTpSl)
 showTpSl = input.bool(true, "Show TP/SL lines", group = groupTpSl)
 
@@ -50,6 +70,14 @@ bearColor = input.color(color.rgb(242, 76, 86), "Sell color", group = groupVisua
 
 // ---------- generic per-TF state via request.security ----------
 // NOTE: security() expression must NOT contain local vars; only Pine builtins + global inputs.
+// Effective values: override if > 0, else auto-by-chart-timeframe.
+regmeLength  = regmeLengthIn > 0 ? regmeLengthIn : cfgRegmeLen
+volMultEntry = volMultEntryIn > 0 ? volMultEntryIn : cfgVolMult
+minBodyAtr   = minBodyAtrIn > 0 ? minBodyAtrIn : cfgMinBodyAtr
+vdoBandLen   = vdoBandLenIn > 0 ? vdoBandLenIn : cfgVdoBandLen
+slAtrMult    = slAtrMultIn > 0 ? slAtrMultIn : cfgSlAtr
+tpRR         = tpRRIn > 0 ? tpRRIn : cfgTpRR
+
 [eStrBullE, eStrBearE] = request.security(syminfo.tickerid, entryTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
 [cStrBullC, cStrBearC] = request.security(syminfo.tickerid, confirmTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
 [tStrBullT, tStrBearT] = request.security(syminfo.tickerid, trendTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
