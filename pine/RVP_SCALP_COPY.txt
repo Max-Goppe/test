@@ -1,6 +1,6 @@
 //@version=6
 // RVP SCALP - multitimeframe scalping indicator for XAUUSD (tuned on MT5 GOLD M5 export 2022-2026).
-// Trend line + MTF confluence table + scalp BUY/SELL signals with TP/SL lines.
+// Trend line + MTF confluence table + scalp BUY/SELL signals (no TP/SL - exit management is manual).
 indicator("RVP SCALP", "RVP SCALP", overlay = true, max_labels_count = 50, max_boxes_count = 50, precision = 2)
 
 // --- Auto presets: settings follow the CHART timeframe (timeframe.period), not an input.
@@ -10,12 +10,13 @@ bool isM1  = tfSec <= 60
 bool isM5  = tfSec > 60 and tfSec <= 300
 bool isM15 = tfSec > 300 and tfSec <= 900
 bool isH1  = tfSec > 900 and tfSec <= 3600
-int   cfgRegmeLen    = isH1 ? 100 : isM15 ? 55 : 34
-float cfgVolMult     = isH1 ? 1.3 : isM15 ? 1.3 : 1.6
-float cfgMinBodyAtr  = isH1 ? 0.30 : isM15 ? 0.60 : 0.75
-int   cfgVdoBandLen  = isH1 ? 100 : isM15 ? 24 : 50
-float cfgTpRR        = isH1 ? 2.0 : isM15 ? 1.5 : 1.0
-float cfgSlAtr       = 2.0
+int   cfgRegmeLen    = isH1 ? 100 : isM15 ? 55 : isM5 ? 34 : 24
+float cfgVolMult     = isH1 or isM15 ? 1.3 : isM5 ? 1.6 : 1.8
+float cfgMinBodyAtr  = isH1 ? 0.30 : isM15 ? 0.60 : isM5 ? 0.75 : 0.85
+int   cfgVdoBandLen  = isH1 ? 100 : isM15 ? 24 : isM5 ? 50 : 34
+int   cfgCooldown    = isM1 ? 4 : isM5 ? 6 : 8
+int   cfgMaxZones    = isM1 ? 12 : 16
+int   cfgZoneExtend  = isM1 ? 90 : isM5 ? 120 : 150
 
 groupTf = "Timeframes"
 entryTfIn   = input.timeframe("", "Entry timeframe (empty = chart)", group = groupTf)
@@ -23,44 +24,34 @@ confirmTfIn = input.timeframe("", "Confirm timeframe (empty = auto x3 of chart)"
 trendTfIn   = input.timeframe("", "Trend timeframe (empty = auto x9-x12 of chart)", group = groupTf)
 // Auto MTF ladder follows the CHART timeframe: confirm ~x3, trend ~x9-x12.
 cfgConfirmTf = tfSec <= 60 ? "3" : tfSec <= 300 ? "15" : tfSec <= 900 ? "60" : tfSec <= 3600 ? "240" : "D"
-cfgTrendTf   = tfSec <= 60 ? "9" : tfSec <= 300 ? "60" : tfSec <= 900 ? "240" : tfSec <= 3600 ? "D" : "W"
+cfgTrendTf   = tfSec <= 60 ? "5" : tfSec <= 300 ? "60" : tfSec <= 900 ? "240" : tfSec <= 3600 ? "D" : "W"
 entryTf   = entryTfIn
 confirmTf = confirmTfIn != "" ? confirmTfIn : cfgConfirmTf
 trendTf   = trendTfIn != "" ? trendTfIn : cfgTrendTf
 
 groupCore = "REGME core (per TF)"
-regmeLengthIn = input.int(0, "REGME length (0 = auto by chart TF)", minval = 0, group = groupCore, tooltip = "Auto: M1/M5=34, M15=55, H1=100")
+regmeLengthIn = input.int(0, "REGME length (0 = auto by chart TF)", minval = 0, group = groupCore, tooltip = "Auto: M1=24, M5=34, M15=55, H1=100")
 regmeSmooth   = input.int(8, "REGME smoothing", minval = 1, group = groupCore)
 atrLength     = input.int(14, "ATR length", minval = 1, group = groupCore)
 volumeBaseLen = input.int(50, "Volume baseline", minval = 5, group = groupCore)
-volMultEntryIn = input.float(0.0, "Vol multiplier entry TF (0 = auto)", minval = 0.0, step = 0.1, group = groupCore, tooltip = "Auto: H1/M15=1.3, M5=1.6")
+volMultEntryIn = input.float(0.0, "Vol multiplier entry TF (0 = auto)", minval = 0.0, step = 0.1, group = groupCore, tooltip = "Auto: H1/M15=1.3, M5=1.6, M1=1.8")
 volMultBig    = input.float(2.0, "Vol multiplier (confirm/trend TF)", minval = 0.5, step = 0.1, group = groupCore)
-minBodyAtrIn = input.float(0.0, "Min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupCore, tooltip = "Auto: H1=0.30, M15=0.60, M5=0.75")
+minBodyAtrIn = input.float(0.0, "Min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupCore, tooltip = "Auto: H1=0.30, M15=0.60, M5=0.75, M1=0.85")
 
 groupZones = "Zones (entry TF)"
 showZones = input.bool(true, "Show dynamic zones", group = groupZones)
-maxZones = input.int(16, "Max zones per side", minval = 4, maxval = 20, group = groupZones)
-zoneExtendBars = input.int(120, "Zone projection bars", minval = 10, maxval = 300, group = groupZones)
+maxZonesIn = input.int(0, "Max zones per side (0 = auto)", minval = 0, maxval = 20, group = groupZones, tooltip = "Auto: M1=12, others=16")
+zoneExtendIn = input.int(0, "Zone projection bars (0 = auto)", minval = 0, maxval = 300, group = groupZones, tooltip = "Auto: M1=90, M5=120, others=150")
 touchLookback = input.int(3, "Touch valid N bars", minval = 1, maxval = 10, group = groupZones)
 
 groupSignal = "Scalp signal rules"
 requireAllTf = input.bool(true, "Require ALL timeframes aligned", group = groupSignal, tooltip = "Off = allow 2 of 3 TFs to agree.")
 vdoLength = input.int(14, "VDO length", minval = 2, group = groupSignal)
 vdoSigLen = input.int(8, "VDO signal length", minval = 1, group = groupSignal)
-vdoBandLenIn = input.int(0, "VDO band length (0 = auto)", minval = 0, group = groupSignal, tooltip = "Auto: H1=100, M15=24, M5=50")
+vdoBandLenIn = input.int(0, "VDO band length (0 = auto)", minval = 0, group = groupSignal, tooltip = "Auto: H1=100, M15=24, M5=50, M1=34")
 vdoBandMult = input.float(1.35, "VDO band width", minval = 0.5, step = 0.05, group = groupSignal)
 breakoutLookback = input.int(3, "VDO breakout valid N bars", minval = 1, maxval = 10, group = groupSignal)
-cooldownBars = input.int(6, "Signal cooldown bars", minval = 1, maxval = 30, group = groupSignal)
-
-groupTpSl = "TP / SL levels"
-slMode = input.string("Zone edge + buffer", "Stop-loss basis", options = ["Zone edge + buffer", "ATR multiple", "Fixed %"], group = groupTpSl)
-slAtrMultIn = input.float(0.0, "SL ATR multiple (0 = auto)", minval = 0.0, step = 0.1, group = groupTpSl, tooltip = "Auto: 2.0 (best across all TFs)")
-slPct = input.float(0.3, "SL fixed %", minval = 0.05, step = 0.05, group = groupTpSl)
-slBufferAtr = input.float(0.15, "Zone-edge buffer (ATR)", minval = 0.0, step = 0.05, group = groupTpSl)
-tpMode = input.string("R multiple", "Take-profit basis", options = ["R multiple", "ATR multiple"], group = groupTpSl)
-tpRRIn = input.float(0.0, "TP R-multiple (0 = auto)", minval = 0.0, step = 0.25, group = groupTpSl, tooltip = "Auto: H1=2.0, M15=1.5, M5=1.0")
-tpAtrMult = input.float(3.0, "TP ATR multiple", minval = 0.5, step = 0.25, group = groupTpSl)
-showTpSl = input.bool(true, "Show TP/SL lines", group = groupTpSl)
+cooldownIn = input.int(0, "Signal cooldown bars (0 = auto)", minval = 0, maxval = 30, group = groupSignal, tooltip = "Auto: M1=4, M5=6, others=8")
 
 groupVisuals = "Visuals"
 showTable = input.bool(true, "Show status table", group = groupVisuals)
@@ -71,12 +62,13 @@ bearColor = input.color(color.rgb(242, 76, 86), "Sell color", group = groupVisua
 // ---------- generic per-TF state via request.security ----------
 // NOTE: security() expression must NOT contain local vars; only Pine builtins + global inputs.
 // Effective values: override if > 0, else auto-by-chart-timeframe.
-regmeLength  = regmeLengthIn > 0 ? regmeLengthIn : cfgRegmeLen
-volMultEntry = volMultEntryIn > 0 ? volMultEntryIn : cfgVolMult
-minBodyAtr   = minBodyAtrIn > 0 ? minBodyAtrIn : cfgMinBodyAtr
-vdoBandLen   = vdoBandLenIn > 0 ? vdoBandLenIn : cfgVdoBandLen
-slAtrMult    = slAtrMultIn > 0 ? slAtrMultIn : cfgSlAtr
-tpRR         = tpRRIn > 0 ? tpRRIn : cfgTpRR
+regmeLength    = regmeLengthIn > 0 ? regmeLengthIn : cfgRegmeLen
+volMultEntry   = volMultEntryIn > 0 ? volMultEntryIn : cfgVolMult
+minBodyAtr     = minBodyAtrIn > 0 ? minBodyAtrIn : cfgMinBodyAtr
+vdoBandLen     = vdoBandLenIn > 0 ? vdoBandLenIn : cfgVdoBandLen
+maxZones       = maxZonesIn > 0 ? maxZonesIn : cfgMaxZones
+zoneExtendBars = zoneExtendIn > 0 ? zoneExtendIn : cfgZoneExtend
+cooldownBars   = cooldownIn > 0 ? cooldownIn : cfgCooldown
 
 [eStrBullE, eStrBearE] = request.security(syminfo.tickerid, entryTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
 [cStrBullC, cStrBearC] = request.security(syminfo.tickerid, confirmTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
@@ -149,8 +141,6 @@ if bearishImpulse
 
 var int lastDemandTouchBar = 0
 var int lastSupplyTouchBar = 0
-var float lastDemandEdge = 0.0
-var float lastSupplyEdge = 0.0
 bool touchDemandThisBar = false
 bool touchSupplyThisBar = false
 
@@ -165,7 +155,6 @@ if array.size(demandTops) > 0
         bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
         if tested and not wasTested
             lastDemandTouchBar := bar_index
-            lastDemandEdge := bottom
             touchDemandThisBar := true
         if tested
             array.set(demandTouched, i, true)
@@ -189,7 +178,6 @@ if array.size(supplyTops) > 0
         bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
         if tested and not wasTested
             lastSupplyTouchBar := bar_index
-            lastSupplyEdge := top
             touchSupplyThisBar := true
         if tested
             array.set(supplyTouched, i, true)
@@ -235,90 +223,6 @@ bool sellSignal = sellSetup and not inCooldown
 if buySignal or sellSignal
     lastSignalBar := bar_index
 
-// ---------- TP / SL ----------
-var float posSide = 0.0
-var float posTp = 0.0
-var float posSl = 0.0
-var int posClosedBar = 0
-var string posResult = ""
-var line tpLine = na
-var line slLine = na
-var label tpLbl = na
-var label slLbl = na
-
-f_stopLevel(bool _isBuy, float _price, float _edge, bool _hasEdge) =>
-    float slp = _isBuy ? _price - atr * slAtrMult : _price + atr * slAtrMult
-    if slMode == "Zone edge + buffer"
-        if _hasEdge and _edge > 0
-            slp := _isBuy ? _edge - atr * slBufferAtr : _edge + atr * slBufferAtr
-    else if slMode == "Fixed %"
-        slp := _isBuy ? _price * (1 - slPct / 100) : _price * (1 + slPct / 100)
-    slp
-
-if buySignal and posSide <= 0
-    posSide := 1
-    posSl := f_stopLevel(true, close, lastDemandEdge, lastDemandTouchBar > 0)
-    float risk = math.abs(close - posSl)
-    posTp := tpMode == "R multiple" ? close + risk * tpRR : close + atr * tpAtrMult
-    posResult := ""
-    line.delete(tpLine)
-    line.delete(slLine)
-    label.delete(tpLbl)
-    label.delete(slLbl)
-    if showTpSl
-        tpLine := line.new(bar_index, posTp, bar_index + 1, posTp, extend = extend.right, color = bullColor, width = 2)
-        slLine := line.new(bar_index, posSl, bar_index + 1, posSl, extend = extend.right, color = bearColor, width = 2, style = line.style_dashed)
-        tpLbl := label.new(bar_index, posTp, "TP " + str.tostring(posTp, format.mintick), style = label.style_none, textcolor = bullColor, size = size.small)
-        slLbl := label.new(bar_index, posSl, "SL " + str.tostring(posSl, format.mintick), style = label.style_none, textcolor = bearColor, size = size.small)
-
-if sellSignal and posSide >= 0
-    posSide := -1
-    posSl := f_stopLevel(false, close, lastSupplyEdge, lastSupplyTouchBar > 0)
-    float risk = math.abs(posSl - close)
-    posTp := tpMode == "R multiple" ? close - risk * tpRR : close - atr * tpAtrMult
-    posResult := ""
-    line.delete(tpLine)
-    line.delete(slLine)
-    label.delete(tpLbl)
-    label.delete(slLbl)
-    if showTpSl
-        tpLine := line.new(bar_index, posTp, bar_index + 1, posTp, extend = extend.right, color = bearColor, width = 2)
-        slLine := line.new(bar_index, posSl, bar_index + 1, posSl, extend = extend.right, color = bullColor, width = 2, style = line.style_dashed)
-        tpLbl := label.new(bar_index, posTp, "TP " + str.tostring(posTp, format.mintick), style = label.style_none, textcolor = bearColor, size = size.small)
-        slLbl := label.new(bar_index, posSl, "SL " + str.tostring(posSl, format.mintick), style = label.style_none, textcolor = bullColor, size = size.small)
-
-if posSide > 0 and posResult == ""
-    if low <= posSl
-        posResult := "closed: SL"
-        posClosedBar := bar_index
-    else if high >= posTp
-        posResult := "closed: TP"
-        posClosedBar := bar_index
-    else if sellSignal
-        posResult := "closed: FLIP"
-        posClosedBar := bar_index
-if posSide < 0 and posResult == ""
-    if high >= posSl
-        posResult := "closed: SL"
-        posClosedBar := bar_index
-    else if low <= posTp
-        posResult := "closed: TP"
-        posClosedBar := bar_index
-    else if buySignal
-        posResult := "closed: FLIP"
-        posClosedBar := bar_index
-
-if posResult != "" and bar_index - posClosedBar > 8
-    line.delete(tpLine)
-    line.delete(slLine)
-    label.delete(tpLbl)
-    label.delete(slLbl)
-    tpLine := na
-    slLine := na
-    tpLbl := na
-    slLbl := na
-    posSide := 0
-
 // ---------- signal labels ----------
 if buySignal
     label.new(bar_index, low, "⚑ BUY", style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
@@ -331,20 +235,17 @@ if touchSupplyThisBar
 
 // ---------- status table ----------
 cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
-var table panel = table.new(cornerPos, 2, 7, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
+var table panel = table.new(cornerPos, 2, 6, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
 
 string stateTxt = buySignal ? "BUY" : sellSignal ? "SELL" : bullAligned ? "Bullish" : bearAligned ? "Bearish" : "Mixed"
 color stateCol = buySignal ? bullColor : sellSignal ? bearColor : bullAligned ? color.new(bullColor, 40) : bearAligned ? color.new(bearColor, 40) : color.new(color.gray, 30)
-
-string posTxt = posSide > 0 and posResult == "" ? "LONG TP " + str.tostring(posTp, format.mintick) + " / SL " + str.tostring(posSl, format.mintick) : posSide < 0 and posResult == "" ? "SHORT TP " + str.tostring(posTp, format.mintick) + " / SL " + str.tostring(posSl, format.mintick) : posResult != "" ? posResult : "none"
-color posCol = posSide > 0 ? bullColor : posSide < 0 ? bearColor : color.gray
 
 if showTable and barstate.islast
     table.cell(panel, 0, 0, "STATE", text_color = stateCol, text_size = size.large)
     table.cell(panel, 1, 0, stateTxt, text_color = stateCol, text_size = size.large)
     table.cell(panel, 0, 1, "Trend MTF", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 1, str.tostring(mtfBull) + "▲ / " + str.tostring(mtfBear) + "▼", text_color = mtfBull > mtfBear ? bullColor : mtfBear > mtfBull ? bearColor : color.gray, text_size = size.small)
-    table.cell(panel, 0, 2, "Structure (" + entryTf + "/" + confirmTf + "/" + trendTf + ")", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 0, 2, "Structure (chart/" + confirmTf + "/" + trendTf + ")", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 2, (eStrBullE ? "▲" : eStrBearE ? "▼" : "–") + (cStrBullC ? "▲" : cStrBearC ? "▼" : "–") + (tStrBullT ? "▲" : tStrBearT ? "▼" : "–"), text_color = priceAboveRegme ? bullColor : bearColor, text_size = size.small)
     table.cell(panel, 0, 3, "Momentum", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 3, eMomBullE or cMomBullC or tMomBullT ? "bull impulse" : eMomBearE or cMomBearC or tMomBearT ? "bear impulse" : "quiet", text_color = color.white, text_size = size.small)
@@ -352,8 +253,6 @@ if showTable and barstate.islast
     table.cell(panel, 1, 4, volumeImpulse ? "impulse x" + str.tostring(vol / volBase, "#.#") : "normal", text_color = volumeImpulse ? color.yellow : color.gray, text_size = size.small)
     table.cell(panel, 0, 5, "Zone / VDO", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 5, (freshDemandTouch ? "demand T" : freshSupplyTouch ? "supply T" : "no touch") + " | VDO " + str.tostring(vdo, "#.#") + (vdoBullBreakout ? " ^brk" : vdoBearBreakout ? " vbrk" : ""), text_color = color.white, text_size = size.small)
-    table.cell(panel, 0, 6, "Position", text_color = color.silver, text_size = size.small)
-    table.cell(panel, 1, 6, posTxt, text_color = posCol, text_size = size.small)
 
 alertcondition(buySignal, "SCALP BUY", "Scalp BUY {{ticker}} {{interval}} price {{close}}")
 alertcondition(sellSignal, "SCALP SELL", "Scalp SELL {{ticker}} {{interval}} price {{close}}")
