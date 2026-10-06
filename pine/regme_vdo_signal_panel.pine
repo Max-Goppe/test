@@ -1,6 +1,6 @@
 //@version=6
 // This is a Pine Script v6 INDICATOR (not a strategy) - it only displays signals, no orders.
-indicator("INV REGME+VDO Signal Panel", "RVP SIGNAL", overlay = true, max_labels_count = 50, max_boxes_count = 50, max_lines_count = 50, precision = 2)
+indicator("REGME+VDO Signal Panel", "RVP SIGNAL", overlay = true, max_labels_count = 50, max_boxes_count = 50, max_lines_count = 50, precision = 2)
 
 // Combined signal engine for REGME + VDO, following the tuning conclusions from the MT5 GOLD M5 export:
 //  - best reaction on H1; zone-touch entries with trend; VDO band-breakout confirmation;

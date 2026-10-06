@@ -1,7 +1,7 @@
 //@version=6
 // RVP SCALP - multitimeframe scalping indicator for XAUUSD (tuned on MT5 GOLD M5 export 2022-2026).
 // Trend line + MTF confluence table + scalp BUY/SELL signals with TP/SL lines.
-indicator("INV RVP SCALP", "RVP SCALP", overlay = true, max_labels_count = 50, max_boxes_count = 50, precision = 2)
+indicator("RVP SCALP", "RVP SCALP", overlay = true, max_labels_count = 50, max_boxes_count = 50, precision = 2)
 
 groupTf = "Timeframes"
 entryTf   = input.timeframe("", "Entry timeframe (empty = chart)", group = groupTf)
