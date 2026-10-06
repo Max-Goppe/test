@@ -6,21 +6,21 @@ indicator("RVP SCALP", "RVP SCALP", overlay = true, max_labels_count = 50, max_b
 // --- Auto presets: settings follow the CHART timeframe (timeframe.period), not an input.
 // Tuned on MT5 GOLD M5 export 2022-2026 (entry TF = chart TF; confirm = x3; trend = x9..x12).
 tfSec = timeframe.in_seconds(timeframe.period)
-bool isM1  = tfSec <= 60
-bool isM5  = tfSec > 60 and tfSec <= 300
-bool isM15 = tfSec > 300 and tfSec <= 900
-bool isUp  = tfSec > 900
+isM1 = tfSec <= 60
+isM5 = tfSec > 60 and tfSec <= 300
+isM15 = tfSec > 300 and tfSec <= 900
+isUp = tfSec > 900
 // Scalping focus: presets tuned for M1/M5/M15 only (backtest on MT5 GOLD 2022-2026).
 // Above M15 the scalping edge disappears, so higher charts fall back to the M15 profile.
-int   cfgRegmeLen    = isM15 or isUp ? 55 : isM5 ? 34 : 24
-float cfgVolMult     = isM15 or isUp ? 2.0 : isM5 ? 2.0 : 1.8
-float cfgMinBodyAtr  = isM15 or isUp ? 0.50 : isM5 ? 0.50 : 0.85
-int   cfgVdoBandLen  = isM15 or isUp ? 24 : isM5 ? 50 : 34
-int   cfgCooldown    = isM1 ? 4 : isM5 ? 6 : 8
-int   cfgTouchLook   = isM5 or isM1 ? 6 : 4
-int   cfgZoneAge     = isM1 ? 24 : isM15 or isUp ? 60 : 40
-int   cfgMaxZones    = isM1 ? 12 : 16
-int   cfgZoneExtend  = isM1 ? 90 : isM5 ? 120 : 150
+cfgRegmeLen = isM15 or isUp ? 55 : isM5 ? 34 : 24
+cfgVolMult = isM15 or isUp ? 2.0 : isM5 ? 2.0 : 1.8
+cfgMinBodyAtr = isM15 or isUp ? 0.50 : isM5 ? 0.50 : 0.85
+cfgVdoBandLen = isM15 or isUp ? 24 : isM5 ? 50 : 34
+cfgCooldown = isM1 ? 4 : isM5 ? 6 : 8
+cfgTouchLook = isM5 or isM1 ? 6 : 4
+cfgZoneAge = isM1 ? 24 : isM15 or isUp ? 60 : 40
+cfgMaxZones = isM1 ? 12 : 16
+cfgZoneExtend = isM1 ? 90 : isM5 ? 120 : 150
 
 groupTf = "Timeframes (scalping: M1-M15)"
 entryTfIn   = input.timeframe("", "Entry timeframe (empty = chart)", group = groupTf)
@@ -62,7 +62,7 @@ cooldownIn = input.int(0, "Signal cooldown bars (0 = auto)", minval = 0, maxval 
 
 groupVisuals = "Visuals"
 showTable = input.bool(true, "Show status table", group = groupVisuals)
-tableCorner = input.string("Top right", "Table position", options = ["Top left", "Top right", "Bottom left", "Bottom right"], group = groupVisuals)
+tableCorner = input.string("Верх справа", "Позиция таблицы", options = ["Верх слева", "Верх справа", "Низ слева", "Низ справа"], group = groupVisuals)
 bullColor = input.color(color.rgb(22, 230, 120), "Buy color", group = groupVisuals)
 bearColor = input.color(color.rgb(242, 76, 86), "Sell color", group = groupVisuals)
 
@@ -87,25 +87,25 @@ zoneAgeMax     = zoneAgeMaxIn > 0 ? zoneAgeMaxIn : cfgZoneAge
 [cMomBullC, cMomBearC] = request.security(syminfo.tickerid, confirmTf, [math.abs(close - open) >= ta.atr(atrLength) * minBodyAtr and close > open and volume > ta.sma(nz(volume, 0.0), volumeBaseLen) * volMultBig, math.abs(close - open) >= ta.atr(atrLength) * minBodyAtr and close < open and volume > ta.sma(nz(volume, 0.0), volumeBaseLen) * volMultBig], lookahead = barmerge.lookahead_off)
 [tMomBullT, tMomBearT] = request.security(syminfo.tickerid, trendTf, [math.abs(close - open) >= ta.atr(atrLength) * minBodyAtr and close > open and volume > ta.sma(nz(volume, 0.0), volumeBaseLen) * volMultBig, math.abs(close - open) >= ta.atr(atrLength) * minBodyAtr and close < open and volume > ta.sma(nz(volume, 0.0), volumeBaseLen) * volMultBig], lookahead = barmerge.lookahead_off)
 
-int mtfBull = (eStrBullE ? 1 : 0) + (cStrBullC ? 1 : 0) + (tStrBullT ? 1 : 0)
-int mtfBear = (eStrBearE ? 1 : 0) + (cStrBearC ? 1 : 0) + (tStrBearT ? 1 : 0)
-bool bullAligned = requireAllTf ? mtfBull == 3 : mtfBull >= 2
-bool bearAligned = requireAllTf ? mtfBear == 3 : mtfBear >= 2
+mtfBull = (eStrBullE ? 1 : 0) + (cStrBullC ? 1 : 0) + (tStrBullT ? 1 : 0)
+mtfBear = (eStrBearE ? 1 : 0) + (cStrBearC ? 1 : 0) + (tStrBearT ? 1 : 0)
+bullAligned = requireAllTf ? mtfBull == 3 : mtfBull >= 2
+bearAligned = requireAllTf ? mtfBear == 3 : mtfBear >= 2
 
 // ---------- entry-TF native calcs (line, zones, VDO) ----------
-float vol = nz(volume, 0.0)
-float atr = ta.atr(atrLength)
-float vwmaPrice = ta.vwma(hlc3, regmeLength)
-float regme = ta.ema(vwmaPrice, regmeSmooth)
-bool priceAboveRegme = close >= regme
+vol = nz(volume, 0.0)
+atr = ta.atr(atrLength)
+vwmaPrice = ta.vwma(hlc3, regmeLength)
+regme = ta.ema(vwmaPrice, regmeSmooth)
+priceAboveRegme = close >= regme
 plot(regme, "REGME trend", color = priceAboveRegme ? bullColor : bearColor, linewidth = 4)
 
-float volBase = ta.sma(vol, volumeBaseLen)
-bool volumeImpulse = volBase > 0 and vol > volBase * volMultEntry
-bool rangeImpulse = atr > 0 and math.abs(close - open) >= atr * minBodyAtr and (high - low) >= atr * 0.9
+volBase = ta.sma(vol, volumeBaseLen)
+volumeImpulse = volBase > 0 and vol > volBase * volMultEntry
+rangeImpulse = atr > 0 and math.abs(close - open) >= atr * minBodyAtr and (high - low) >= atr * 0.9
 
-bool bullishImpulse = showZones and volumeImpulse and rangeImpulse and close > open and close > regme
-bool bearishImpulse = showZones and volumeImpulse and rangeImpulse and close < open and close < regme
+bullishImpulse = showZones and volumeImpulse and rangeImpulse and close > open and close > regme
+bearishImpulse = showZones and volumeImpulse and rangeImpulse and close < open and close < regme
 
 var array<float> demandTops = array.new<float>()
 var array<float> demandBottoms = array.new<float>()
@@ -119,7 +119,7 @@ var array<bool>  supplyTouched = array.new<bool>()
 var array<box>   supplyBoxes = array.new<box>()
 
 if bullishImpulse
-    float zTop = math.min(open, close)
+    zTop = math.min(open, close)
     array.push(demandTops, zTop)
     array.push(demandBottoms, low)
     array.push(demandBirth, bar_index)
@@ -134,7 +134,7 @@ if bullishImpulse
         array.shift(demandTouched)
 
 if bearishImpulse
-    float zBottom = math.max(open, close)
+    zBottom = math.max(open, close)
     array.push(supplyTops, high)
     array.push(supplyBottoms, zBottom)
     array.push(supplyBirth, bar_index)
@@ -150,18 +150,18 @@ if bearishImpulse
 
 var int lastDemandTouchBar = 0
 var int lastSupplyTouchBar = 0
-bool touchDemandThisBar = false
-bool touchSupplyThisBar = false
+touchDemandThisBar = false
+touchSupplyThisBar = false
 
 if array.size(demandTops) > 0
     for i = 0 to array.size(demandTops) - 1
-        float top = array.get(demandTops, i)
-        float bottom = array.get(demandBottoms, i)
-        int birth = array.get(demandBirth, i)
-        bool wasTested = array.get(demandTouched, i)
-        bool broken = close < bottom or bar_index - birth > zoneAgeMax
-        bool inZone = low <= top and high >= bottom
-        bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
+        top = array.get(demandTops, i)
+        bottom = array.get(demandBottoms, i)
+        birth = array.get(demandBirth, i)
+        wasTested = array.get(demandTouched, i)
+        broken = close < bottom or bar_index - birth > zoneAgeMax
+        inZone = low <= top and high >= bottom
+        tested = broken or wasTested ? wasTested : inZone and bar_index > birth
         if tested and not wasTested
             lastDemandTouchBar := bar_index
             touchDemandThisBar := true
@@ -178,13 +178,13 @@ if array.size(demandTops) > 0
 
 if array.size(supplyTops) > 0
     for i = 0 to array.size(supplyTops) - 1
-        float top = array.get(supplyTops, i)
-        float bottom = array.get(supplyBottoms, i)
-        int birth = array.get(supplyBirth, i)
-        bool wasTested = array.get(supplyTouched, i)
-        bool broken = close > top or bar_index - birth > zoneAgeMax
-        bool inZone = high >= bottom and low <= top
-        bool tested = broken or wasTested ? wasTested : inZone and bar_index > birth
+        top = array.get(supplyTops, i)
+        bottom = array.get(supplyBottoms, i)
+        birth = array.get(supplyBirth, i)
+        wasTested = array.get(supplyTouched, i)
+        broken = close > top or bar_index - birth > zoneAgeMax
+        inZone = high >= bottom and low <= top
+        tested = broken or wasTested ? wasTested : inZone and bar_index > birth
         if tested and not wasTested
             lastSupplyTouchBar := bar_index
             touchSupplyThisBar := true
@@ -199,74 +199,87 @@ if array.size(supplyTops) > 0
                 box.set_bgcolor(sB, color.new(bearColor, 79))
                 box.set_border_color(sB, color.new(bearColor, 15))
 
-bool freshDemandTouch = lastDemandTouchBar > 0 and bar_index - lastDemandTouchBar <= touchLookback
-bool freshSupplyTouch = lastSupplyTouchBar > 0 and bar_index - lastSupplyTouchBar <= touchLookback
+freshDemandTouch = lastDemandTouchBar > 0 and bar_index - lastDemandTouchBar <= touchLookback
+freshSupplyTouch = lastSupplyTouchBar > 0 and bar_index - lastSupplyTouchBar <= touchLookback
 
 // ---------- VDO on entry TF ----------
-float signedVolume = close > close[1] ? vol : close < close[1] ? -vol : 0.0
-float totalVolume = ta.ema(vol, vdoLength)
-float volumePosition = ta.ema(signedVolume, vdoLength)
-float vzo = totalVolume != 0.0 ? 100.0 * volumePosition / totalVolume : 0.0
-float vdo = math.max(0.0, math.min(100.0, 50.0 + vzo * 0.5))
-float vdoSignalEma = ta.ema(vdo, vdoSigLen)
-float vdoDev = ta.stdev(vdo, vdoBandLen)
-float upperBand = math.min(80.0, vdoSignalEma + vdoDev * vdoBandMult)
-float lowerBand = math.max(20.0, vdoSignalEma - vdoDev * vdoBandMult)
+signedVolume = close > close[1] ? vol : close < close[1] ? -vol : 0.0
+totalVolume = ta.ema(vol, vdoLength)
+volumePosition = ta.ema(signedVolume, vdoLength)
+vzo = totalVolume != 0.0 ? 100.0 * volumePosition / totalVolume : 0.0
+vdo = math.max(0.0, math.min(100.0, 50.0 + vzo * 0.5))
+vdoSignalEma = ta.ema(vdo, vdoSigLen)
+vdoDev = ta.stdev(vdo, vdoBandLen)
+upperBand = math.min(80.0, vdoSignalEma + vdoDev * vdoBandMult)
+lowerBand = math.max(20.0, vdoSignalEma - vdoDev * vdoBandMult)
 
-int vdoBullBars = ta.barssince(ta.crossover(vdo, upperBand))
-int vdoBearBars = ta.barssince(ta.crossunder(vdo, lowerBand))
-bool vdoBullBreakout = not na(vdoBullBars) and vdoBullBars <= breakoutLookback and vdo > vdoSignalEma
-bool vdoBearBreakout = not na(vdoBearBars) and vdoBearBars <= breakoutLookback and vdo < vdoSignalEma
+vdoBullBars = ta.barssince(ta.crossover(vdo, upperBand))
+vdoBearBars = ta.barssince(ta.crossunder(vdo, lowerBand))
+vdoBullBreakout = not na(vdoBullBars) and vdoBullBars <= breakoutLookback and vdo > vdoSignalEma
+vdoBearBreakout = not na(vdoBearBars) and vdoBearBars <= breakoutLookback and vdo < vdoSignalEma
 // Combo confirmation: VDO breakout/extreme aligned with the same direction as the zone touch.
-bool vdoOversold = vdo < 30
-bool vdoOverbought = vdo > 70
+vdoOversold = vdo < 30
+vdoOverbought = vdo > 70
 
 // ---------- scalp signals: all-TF alignment + fresh zone touch (mandatory) ----------
 // "Zone touch only": fires strictly on first touch of a demand/supply zone.
 // "Zone touch or combo": still requires the touch, but skips setups NOT confirmed by VDO
 // (i.e. touch alone passes in both modes; combo mode is stricter: touch AND VDO agree).
-bool buyComboOk  = signalMode == "Zone touch only" ? true : (vdoBullBreakout or vdoOversold or vdo > vdoSignalEma)
-bool sellComboOk = signalMode == "Zone touch only" ? true : (vdoBearBreakout or vdoOverbought or vdo < vdoSignalEma)
-bool buySetup  = bullAligned and priceAboveRegme and freshDemandTouch and buyComboOk
-bool sellSetup = bearAligned and not priceAboveRegme and freshSupplyTouch and sellComboOk
+buyComboOk = signalMode == "Zone touch only" ? true : (vdoBullBreakout or vdoOversold or vdo > vdoSignalEma)
+sellComboOk = signalMode == "Zone touch only" ? true : (vdoBearBreakout or vdoOverbought or vdo < vdoSignalEma)
+buySetup = bullAligned and priceAboveRegme and freshDemandTouch and buyComboOk
+sellSetup = bearAligned and not priceAboveRegme and freshSupplyTouch and sellComboOk
 
 var int lastSignalBar = 0
-bool inCooldown = lastSignalBar > 0 and bar_index - lastSignalBar <= cooldownBars
-bool buySignal = buySetup and not inCooldown
-bool sellSignal = sellSetup and not inCooldown
+inCooldown = lastSignalBar > 0 and bar_index - lastSignalBar <= cooldownBars
+buySignal = buySetup and not inCooldown
+sellSignal = sellSetup and not inCooldown
 if buySignal or sellSignal
     lastSignalBar := bar_index
 
-// ---------- signal labels: plain BUY / SELL plates only ----------
-if buySignal
-    label.new(bar_index, low, "⚑ BUY", style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
-if sellSignal
-    label.new(bar_index, high, "⚑ SELL", style = label.style_label_down, color = bearColor, textcolor = color.black, size = size.normal)
+// ---------- signal labels are OFF by design: all info lives in the Russian table ----------
 
-// ---------- status table ----------
-cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
-var table panel = table.new(cornerPos, 2, 6, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
+// ---------- status table (Russian) ----------
+cornerPos = tableCorner == "Верх слева" ? position.top_left : tableCorner == "Низ слева" ? position.bottom_left : tableCorner == "Низ справа" ? position.bottom_right : position.top_right
+var table panel = table.new(cornerPos, 2, 8, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
 
-string stateTxt = buySignal ? "BUY" : sellSignal ? "SELL" : bullAligned ? "Bullish" : bearAligned ? "Bearish" : "Mixed"
-color stateCol = buySignal ? bullColor : sellSignal ? bearColor : bullAligned ? color.new(bullColor, 40) : bearAligned ? color.new(bearColor, 40) : color.new(color.gray, 30)
+tfRu(tf) =>
+    tf == "D" ? "Д1" : tf == "240" ? "4ч" : tf == "60" ? "1ч" : tf == "15" ? "15м" : tf == "5" ? "5м" : tf == "3" ? "3м" : tf == "1" ? "1м" : tf
+
+sideRu(bull, bear) => bull ? "растёт" : bear ? "падает" : "флэт"
+
+zoneAgeD = lastDemandTouchBar > 0 ? bar_index - lastDemandTouchBar : -1
+zoneAgeS = lastSupplyTouchBar > 0 ? bar_index - lastSupplyTouchBar : -1
+zoneTxt = freshDemandTouch ? "касание зоны спроса (" + str.tostring(zoneAgeD) + " бар. назад)" : freshSupplyTouch ? "касание зоны предложения (" + str.tostring(zoneAgeS) + " бар. назад)" : "касаний зон нет"
+
+readyBuy = bullAligned and priceAboveRegme and freshDemandTouch and buyComboOk
+readySell = bearAligned and not priceAboveRegme and freshSupplyTouch and sellComboOk
+readyTxt = readyBuy ? "ЕСТЬ — лонг по касанию" : readySell ? "ЕСТЬ — шорт по касанию" : bullAligned ? "нет — ждём касания зоны спроса" : bearAligned ? "нет — ждём касания зоны предложения" : "нет — тренды ТФ не согласованы"
+readyCol = readyBuy ? bullColor : readySell ? bearColor : color.gray
+
+lookForTxt = bullAligned ? "Смотреть ЛОНГИ от зон спроса" : bearAligned ? "Смотреть ШОРТЫ от зон предложения" : "Нет направления — в сделки не входить"
+lookForCol = bullAligned ? bullColor : bearAligned ? bearColor : color.gray
+
+phaseTxt = mtfBull == 3 ? "Сильный бычий тренд" : mtfBear == 3 ? "Сильный медвежий тренд" : mtfBull == 2 ? "Бычий тренд" : mtfBear == 2 ? "Медвежий тренд" : mtfBull == 1 ? "Слабо бычий (сомнительно)" : mtfBear == 1 ? "Слабо медвежий (сомнительно)" : "Флэт / разнобой"
+phaseCol = mtfBull > mtfBear ? bullColor : mtfBear > mtfBull ? bearColor : color.gray
 
 if showTable and barstate.islast
-    table.cell(panel, 0, 0, "STATE", text_color = stateCol, text_size = size.large)
-    table.cell(panel, 1, 0, stateTxt, text_color = stateCol, text_size = size.large)
-    table.cell(panel, 0, 1, "Trend MTF", text_color = color.silver, text_size = size.small)
-    string trendWord = mtfBull == 3 ? "Strong bullish" : mtfBear == 3 ? "Strong bearish" : mtfBull == 2 ? "Bullish" : mtfBear == 2 ? "Bearish" : mtfBull == 1 ? "Weak bullish" : mtfBear == 1 ? "Weak bearish" : "Flat"
-    table.cell(panel, 1, 1, trendWord, text_color = mtfBull > mtfBear ? bullColor : mtfBear > mtfBull ? bearColor : color.gray, text_size = size.small)
-    table.cell(panel, 0, 2, "Structure (chart/" + confirmTf + "/" + trendTf + ")", text_color = color.silver, text_size = size.small)
-    string chartWord = eStrBullE ? "up" : eStrBearE ? "down" : "flat"
-    string confirmWord = cStrBullC ? "up" : cStrBearC ? "down" : "flat"
-    string trendSideWord = tStrBullT ? "up" : tStrBearT ? "down" : "flat"
-    table.cell(panel, 1, 2, chartWord + " / " + confirmWord + " / " + trendSideWord, text_color = priceAboveRegme ? bullColor : bearColor, text_size = size.small)
-    table.cell(panel, 0, 3, "Momentum", text_color = color.silver, text_size = size.small)
-    table.cell(panel, 1, 3, eMomBullE or cMomBullC or tMomBullT ? "bull impulse" : eMomBearE or cMomBearC or tMomBearT ? "bear impulse" : "quiet", text_color = color.white, text_size = size.small)
-    table.cell(panel, 0, 4, "Volume (entry TF)", text_color = color.silver, text_size = size.small)
-    table.cell(panel, 1, 4, volumeImpulse ? "impulse x" + str.tostring(vol / volBase, "#.#") : "normal", text_color = volumeImpulse ? color.yellow : color.gray, text_size = size.small)
-    table.cell(panel, 0, 5, "Zone / VDO", text_color = color.silver, text_size = size.small)
-    table.cell(panel, 1, 5, (freshDemandTouch ? "demand T" : freshSupplyTouch ? "supply T" : "no touch") + " | VDO " + str.tostring(vdo, "#.#") + (vdoBullBreakout ? " ^brk" : vdoBearBreakout ? " vbrk" : ""), text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 0, "СИГНАЛ", text_color = bullColor, text_size = size.large)
+    table.cell(panel, 1, 0, buySignal ? "ПОКУПКА" : sellSignal ? "ПРОДАЖА" : "— нет —", text_color = buySignal ? bullColor : sellSignal ? bearColor : color.gray, text_size = size.large)
+    table.cell(panel, 0, 1, "Фаза рынка", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 1, phaseTxt, text_color = phaseCol, text_size = size.small)
+    table.cell(panel, 0, 2, "Тренды ТФ", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 2, tfRu(timeframe.period) + ": " + sideRu(eStrBullE, eStrBearE) + " | " + tfRu(confirmTf) + ": " + sideRu(cStrBullC, cStrBearC) + " | " + tfRu(trendTf) + ": " + sideRu(tStrBullT, tStrBearT), text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 3, "Куда смотреть", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 3, lookForTxt, text_color = lookForCol, text_size = size.small)
+    table.cell(panel, 0, 4, "Импульс (движение)", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 4, eMomBullE or cMomBullC or tMomBullT ? "бычий импульс" : eMomBearE or cMomBearC or tMomBearT ? "медвежий импульс" : "спокойно", text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 5, "Объём (вход. ТФ)", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 5, volumeImpulse ? "всплеск x" + str.tostring(vol / volBase, "#.#") : "обычный", text_color = volumeImpulse ? color.yellow : color.gray, text_size = size.small)
+    table.cell(panel, 0, 6, "Зоны входа", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 6, zoneTxt + " | VDO " + str.tostring(vdo, "#.#"), text_color = color.white, text_size = size.small)
+    table.cell(panel, 0, 7, "Готовность", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 7, readyTxt, text_color = readyCol, text_size = size.small)
 
 alertcondition(buySignal, "SCALP BUY", "Scalp BUY {{ticker}} {{interval}} price {{close}}")
 alertcondition(sellSignal, "SCALP SELL", "Scalp SELL {{ticker}} {{interval}} price {{close}}")
