@@ -223,15 +223,15 @@ bool sellSignal = sellSetup and not inCooldown
 if buySignal or sellSignal
     lastSignalBar := bar_index
 
-// ---------- signal labels ----------
+// Trigger reason for the current signal (shown inside the BUY/SELL plate itself).
+string buyTrigger = freshDemandTouch ? "zone T" : vdoBullBreakout ? "VDO brk" : "VDO os"
+string sellTrigger = freshSupplyTouch ? "zone T" : vdoBearBreakout ? "VDO brk" : "VDO ob"
+
+// ---------- signal labels (all info folded into the BUY/SELL plates; no standalone "T" marks) ----------
 if buySignal
-    label.new(bar_index, low, "⚑ BUY", style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
+    label.new(bar_index, low, "⚑ BUY\n" + buyTrigger, style = label.style_label_up, color = bullColor, textcolor = color.black, size = size.normal)
 if sellSignal
-    label.new(bar_index, high, "⚑ SELL", style = label.style_label_down, color = bearColor, textcolor = color.black, size = size.normal)
-if touchDemandThisBar
-    label.new(bar_index, low, "T", style = label.style_label_up, color = color.new(bullColor, 60), textcolor = bullColor, size = size.tiny)
-if touchSupplyThisBar
-    label.new(bar_index, high, "T", style = label.style_label_down, color = color.new(bearColor, 60), textcolor = bearColor, size = size.tiny)
+    label.new(bar_index, high, "⚑ SELL\n" + sellTrigger, style = label.style_label_down, color = bearColor, textcolor = color.black, size = size.normal)
 
 // ---------- status table ----------
 cornerPos = tableCorner == "Top left" ? position.top_left : tableCorner == "Bottom left" ? position.bottom_left : tableCorner == "Bottom right" ? position.bottom_right : position.top_right
