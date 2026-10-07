@@ -94,21 +94,18 @@ plot(regme, "REGME trend", color = priceAboveRegme ? bullColor : bearColor, line
 
 // ---------- liquidity pools (clustered highs = BSL above, clustered lows = SSL below) ----------
 // Cluster tolerance: ATR-based (liqTolMult), with a minimum of one mintick so levels never collapse.
-liqTol() =>
-    raw = atr * liqTolMult
-    math.max(raw, syminfo.mintick)
+// NOTE: plain expressions only — multi-line "=>" function bodies are not valid in Pine v6 (CE10156).
+liqTol = math.max(atr * liqTolMult, syminfo.mintick)
 
-// Returns true if an unswept pool level within +/-tol of lvl already exists.
-// NOTE: no typed function params here (float[] / array<bool> in signatures caused CE10156 on some parsers).
+// Returns true if an unswept pool level within +/-tol of lvl already exists (explicit loop, no lambdas).
 liqClusterTop(levels, sweptFlags, lvl, tol) =>
     found = false
     n = array.size(sweptFlags)
-    if n > 0
-        for i = 0 to n - 1
-            lv = array.get(levels, i)
-            sw = array.get(sweptFlags, i)
-            if not sw and not na(lv) and math.abs(lv - lvl) <= tol
-                found := true
+    for i = 0 to n - 1
+        lv = array.get(levels, i)
+        sw = array.get(sweptFlags, i)
+        if not sw and not na(lv) and math.abs(lv - lvl) <= tol
+            found := true
     found
 
 var array<float> bslLevels = array.new<float>()
@@ -124,7 +121,7 @@ var array<label> sslLabels = array.new<label>()
 
 if showLiquidity and not na(high[1]) and bar_index > liqMinBars + 1
     // Swing high/low: local extremum confirmed after liqMinBars+1 bars (no repaint: level taken from history).
-    tol = liqTol()
+    tol = liqTol
     swingHi = high[liqMinBars + 1] == ta.highest(high, 2 * (liqMinBars + 1) + 1)
     swingLo = low[liqMinBars + 1] == ta.lowest(low, 2 * (liqMinBars + 1) + 1)
     // Clustered (not strictly equal) extremes within ATR tolerance over the lookback window.
@@ -267,8 +264,7 @@ sessionRowBg = not useSessionFilter ? color.new(color.gray, 60) : color.new(inTr
 cornerPos = tableCorner == "Верх слева" ? position.top_left : tableCorner == "Низ слева" ? position.bottom_left : tableCorner == "Низ справа" ? position.bottom_right : position.top_right
 var table panel = table.new(cornerPos, 2, 4, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
 
-tfRu(tf) =>
-    tf == "D" ? "Д1" : tf == "240" ? "4ч" : tf == "60" ? "1ч" : tf == "15" ? "15м" : tf == "5" ? "5м" : tf == "3" ? "3м" : tf == "1" ? "1м" : tf
+tfRu(tf) => tf == "D" ? "Д1" : tf == "240" ? "4ч" : tf == "60" ? "1ч" : tf == "15" ? "15м" : tf == "5" ? "5м" : tf == "3" ? "3м" : tf == "1" ? "1м" : tf
 
 sideRu(bull, bear) => bull ? "растёт" : bear ? "падает" : "флэт"
 
