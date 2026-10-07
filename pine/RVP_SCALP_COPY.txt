@@ -175,13 +175,13 @@ if array.size(demandTops) > 0
         if tested
             array.set(demandTouched, i, true)
         box dB = array.get(demandBoxes, i)
-        if showZones and not na(dB)
-            if broken
-                box.delete(dB)
-                array.set(demandBoxes, i, na)
-            else if tested
-                box.set_bgcolor(dB, color.new(bullColor, 79))
-                box.set_border_color(dB, color.new(bullColor, 15))
+        keepD = showZones and not na(dB) and not broken
+        if broken and not na(dB)
+            box.delete(dB)
+            array.set(demandBoxes, i, na)
+        if keepD and tested
+            box.set_bgcolor(dB, color.new(bullColor, 79))
+            box.set_border_color(dB, color.new(bullColor, 15))
 
 if array.size(supplyTops) > 0
     for i = 0 to array.size(supplyTops) - 1
@@ -198,13 +198,13 @@ if array.size(supplyTops) > 0
         if tested
             array.set(supplyTouched, i, true)
         box sB = array.get(supplyBoxes, i)
-        if showZones and not na(sB)
-            if broken
-                box.delete(sB)
-                array.set(supplyBoxes, i, na)
-            else if tested
-                box.set_bgcolor(sB, color.new(bearColor, 79))
-                box.set_border_color(sB, color.new(bearColor, 15))
+        keepS = showZones and not na(sB) and not broken
+        if broken and not na(sB)
+            box.delete(sB)
+            array.set(supplyBoxes, i, na)
+        if keepS and tested
+            box.set_bgcolor(sB, color.new(bearColor, 79))
+            box.set_border_color(sB, color.new(bearColor, 15))
 
 freshDemandTouch = lastDemandTouchBar > 0 and bar_index - lastDemandTouchBar <= touchLookback
 freshSupplyTouch = lastSupplyTouchBar > 0 and bar_index - lastSupplyTouchBar <= touchLookback
