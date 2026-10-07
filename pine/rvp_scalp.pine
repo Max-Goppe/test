@@ -51,7 +51,7 @@ vdoLength = input.int(14, "VDO length", minval = 2, group = groupSignal)
 vdoSigLen = input.int(8, "VDO signal length", minval = 1, group = groupSignal)
 
 groupSession = "Торговые окна (время Екатеринбурга, UTC+5)"
-useSessionFilter = input.bool(true, "Подсвечивать торговые окна цветом", group = groupSession, tooltip = "Зелёный — торгуем (Европа 11-15, США 17-21 ЕКБ), красный — вне окон. Backtest GOLD M5 2022-2026: эти два окна дают лучшее качество движения; азия/ночь - худшее.")
+useSessionFilter = input.bool(true, "Подсвечивать торговое окно в таблице", group = groupSession, tooltip = "Строка «Торговое окно» в таблице: зелёный — торгуем (Европа 11-15, США 17-21 ЕКБ), красный — вне окон. Backtest GOLD M5 2022-2026: эти два окна дают лучшее качество движения; азия/ночь - худшее.")
 sessEurope = input.bool(true, "Окно 1: Европа 11:00-15:00 (ЕКБ)", group = groupSession)
 sessUs = input.bool(true, "Окно 2: США 17:00-21:00 (ЕКБ)", group = groupSession)
 sessCustomFrom = input.int(-1, "Своё окно: час от (-1 = выкл, время ЕКБ)", minval = -1, maxval = 23, group = groupSession)
@@ -188,14 +188,6 @@ vzo = totalVolume != 0.0 ? 100.0 * volumePosition / totalVolume : 0.0
 vdo = math.max(0.0, math.min(100.0, 50.0 + vzo * 0.5))
 vdoSignalEma = ta.ema(vdo, vdoSigLen)
 
-
-// VDO line is drawn on the price panel (overlay indicator): values scaled to bar range for readability.
-vdoMin = ta.lowest(vdo, 100)
-vdoMax = ta.highest(vdo, 100)
-vdoRange = math.max(vdoMax - vdoMin, 0.0001)
-vdoScaled = low - atr * 0.3 + (vdo - vdoMin) / vdoRange * atr * 2.5
-plot(vdoScaled, "VDO (объёмное давление, шкала ATR)", color = vdo >= vdoSignalEma ? color.new(bullColor, 20) : color.new(bearColor, 20), linewidth = 2)
-
 // ---------- session windows (yekaterinburg time, UTC+5): only two active windows give positive expectancy on GOLD ----------
 // NOTE: the old timezone-based hour call was invalid in Pine v6 (CE10272); hours are now computed as UTC hour + manual offset.
 srvOffsetH = input.int(5, "Часовой сдвиг от UTC (ЕКБ = 5)", minval = -12, maxval = 14, group = groupSession, tooltip = "Смещение вашего часового пояса относительно UTC. Екатеринбург (UTC+5) = 5. Если хотите видеть окна в время сервера MT5 (GMT+3), поставьте 3.")
@@ -204,12 +196,9 @@ ekbHour = ekbHourRaw >= 24 ? ekbHourRaw - 24 : ekbHourRaw < 0 ? ekbHourRaw + 24 
 inEuropeWin = sessEurope and ekbHour >= 11 and ekbHour < 15
 inUsWin = sessUs and ekbHour >= 17 and ekbHour < 21
 inCustomWin = sessCustomFrom >= 0 and (sessCustomFrom <= sessCustomTo ? (ekbHour >= sessCustomFrom and ekbHour < sessCustomTo + 1) : (ekbHour >= sessCustomFrom or ekbHour < sessCustomTo + 1))
-sessionTxt = inEuropeWin ? "Европа 11-15 ЕКБ — торгуем" : inUsWin ? "США 17-21 ЕКБ — торгуем" : inCustomWin ? "своё окно ЕКБ — торгуем" : "вне окон — не торгуем"
 inTradeWindow = inEuropeWin or inUsWin or inCustomWin
-sessionCol = not useSessionFilter ? color.gray : inTradeWindow ? bullColor : bearColor
-
-// ---------- visual trading-window background: green = trade, red = don't trade ----------
-bgcolor(useSessionFilter ? color.new(inTradeWindow ? bullColor : bearColor, 90) : na, title = "Фон торгового окна")
+// Торговое окно показывается только цветом строки таблицы: зелёный — торгуем, красный — нет (без текста во втором столбце)
+sessionRowBg = not useSessionFilter ? color.new(color.gray, 60) : color.new(inTradeWindow ? bullColor : bearColor, 75)
 
 // ---------- status table (Russian) ----------
 cornerPos = tableCorner == "Верх слева" ? position.top_left : tableCorner == "Низ слева" ? position.bottom_left : tableCorner == "Низ справа" ? position.bottom_right : position.top_right
@@ -230,5 +219,5 @@ if showTable and barstate.islast
     table.cell(panel, 1, 1, tfRu(timeframe.period) + ": " + sideRu(eStrBullE, eStrBearE) + " | " + tfRu(confirmTf) + ": " + sideRu(cStrBullC, cStrBearC) + " | " + tfRu(trendTf) + ": " + sideRu(tStrBullT, tStrBearT), text_color = color.white, text_size = size.small)
     table.cell(panel, 0, 2, "Импульс (движение)", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 2, eMomBullE or cMomBullC or tMomBullT ? "бычий импульс" : eMomBearE or cMomBearC or tMomBearT ? "медвежий импульс" : "спокойно", text_color = color.white, text_size = size.small)
-    table.cell(panel, 0, 3, "Торговое окно", text_color = color.silver, text_size = size.small)
-    table.cell(panel, 1, 3, sessionTxt + (useSessionFilter ? "" : " (подсветка выкл)"), text_color = sessionCol, text_size = size.small)
+    table.cell(panel, 0, 3, "Торговое окно", text_color = color.silver, text_size = size.small, bgcolor = sessionRowBg)
+    table.cell(panel, 1, 3, "", text_size = size.small, bgcolor = sessionRowBg)
