@@ -1,6 +1,6 @@
 //@version=6
 // RVP SCALP - multitimeframe market-structure indicator for XAUUSD (tuned on MT5 GOLD M5 export 2022-2026).
-// Trend line + MTF confluence table (market phase, TF trends, impulse) + colored trading windows. No signals.
+// Trend line + liquidity zones (BSL/SSL) + MTF confluence table (phase, TF trends, impulse, session color). No signals.
 indicator("RVP SCALP", "RVP SCALP", overlay = true, max_labels_count = 100, max_boxes_count = 50, max_lines_count = 100, precision = 2)
 
 // --- Auto presets: settings follow the CHART timeframe (timeframe.period), not an input.
@@ -15,9 +15,6 @@ isUp = tfSec > 900
 cfgRegmeLen = isM15 or isUp ? 55 : isM5 ? 34 : 24
 cfgVolMult = isM15 or isUp ? 2.0 : isM5 ? 2.0 : 1.8
 cfgMinBodyAtr = isM15 or isUp ? 0.50 : isM5 ? 0.50 : 0.85
-cfgZoneAge = isM1 ? 24 : isM15 or isUp ? 60 : 40
-cfgMaxZones = isM1 ? 12 : 16
-cfgZoneExtend = isM1 ? 90 : isM5 ? 120 : 150
 
 groupTf = "Timeframes (scalping: M1-M15)"
 entryTfIn   = input.timeframe("", "Entry timeframe (empty = chart)", group = groupTf)
@@ -40,15 +37,8 @@ volMultEntryIn = input.float(0.0, "Vol multiplier entry TF (0 = auto)", minval =
 volMultBig    = input.float(2.0, "Vol multiplier (confirm/trend TF)", minval = 0.5, step = 0.1, group = groupCore)
 minBodyAtrIn = input.float(0.0, "Min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupCore, tooltip = "Auto: M5/M15=0.50, M1=0.85")
 
-groupZones = "Zones (entry TF)"
-showZones = input.bool(true, "Show dynamic zones", group = groupZones, tooltip = "Зоны рисуются только на импульсных барах: объём выше нормы И тело свечи >= ATR*множитель И close за линией REGME. Если импульсов нет — зон на графике нет.")
-zoneVolMultIn = input.float(0.0, "Zone impulse vol multiplier (0 = auto)", minval = 0.0, step = 0.1, group = groupZones, tooltip = "Множитель объёма для появления зоны. Auto по ТФ графика: M1=1.8, M5/M15=2.0. Меньше значение — больше зон.")
-zoneBodyAtrIn = input.float(0.0, "Zone impulse min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupZones, tooltip = "Минимальное тело свечи (в ATR) для появления зоны. Auto: M1=0.85, M5/M15=0.50. Меньше значение — больше зон.")
-maxZonesIn = input.int(0, "Max zones per side (0 = auto)", minval = 0, maxval = 20, group = groupZones, tooltip = "Auto: M1=12, others=16")
-zoneExtendIn = input.int(0, "Zone projection bars (0 = auto)", minval = 0, maxval = 300, group = groupZones, tooltip = "Auto: M1=90, M5=120, others=150")
-zoneAgeMaxIn = input.int(0, "Zone age limit bars (0 = auto)", minval = 0, maxval = 200, group = groupZones, tooltip = "How long an untouched zone stays alive waiting for its first touch. Auto: M1=24, M5=40, M15=60.")
 
-groupSignal = "VDO (зоны / объёмное движение)"
+groupSignal = "VDO (объёмное давление)"
 vdoLength = input.int(14, "VDO length", minval = 2, group = groupSignal)
 vdoSigLen = input.int(8, "VDO signal length", minval = 1, group = groupSignal)
 
@@ -80,11 +70,6 @@ liqBearColor = input.color(color.rgb(124, 168, 255), "SSL color (под граф
 regmeLength    = regmeLengthIn > 0 ? regmeLengthIn : cfgRegmeLen
 volMultEntry   = volMultEntryIn > 0 ? volMultEntryIn : cfgVolMult
 minBodyAtr     = minBodyAtrIn > 0 ? minBodyAtrIn : cfgMinBodyAtr
-maxZones       = maxZonesIn > 0 ? maxZonesIn : cfgMaxZones
-zoneExtendBars = zoneExtendIn > 0 ? zoneExtendIn : cfgZoneExtend
-zoneAgeMax     = zoneAgeMaxIn > 0 ? zoneAgeMaxIn : cfgZoneAge
-zoneVolMult    = zoneVolMultIn > 0 ? zoneVolMultIn : cfgVolMult
-zoneBodyAtr    = zoneBodyAtrIn > 0 ? zoneBodyAtrIn : cfgMinBodyAtr
 
 [eStrBullE, eStrBearE] = request.security(syminfo.tickerid, entryTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
 [cStrBullC, cStrBearC] = request.security(syminfo.tickerid, confirmTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
@@ -97,101 +82,12 @@ zoneBodyAtr    = zoneBodyAtrIn > 0 ? zoneBodyAtrIn : cfgMinBodyAtr
 mtfBull = (eStrBullE ? 1 : 0) + (cStrBullC ? 1 : 0) + (tStrBullT ? 1 : 0)
 mtfBear = (eStrBearE ? 1 : 0) + (cStrBearC ? 1 : 0) + (tStrBearT ? 1 : 0)
 
-// ---------- entry-TF native calcs (line, zones, VDO) ----------
 vol = nz(volume, 0.0)
 atr = ta.atr(atrLength)
 vwmaPrice = ta.vwma(hlc3, regmeLength)
 regme = ta.ema(vwmaPrice, regmeSmooth)
 priceAboveRegme = close >= regme
 plot(regme, "REGME trend", color = priceAboveRegme ? bullColor : bearColor, linewidth = 4)
-
-volBase = ta.sma(vol, volumeBaseLen)
-volumeImpulse = volBase > 0 and vol > volBase * zoneVolMult
-rangeImpulse = atr > 0 and math.abs(close - open) >= atr * zoneBodyAtr and (high - low) >= atr * 0.9
-
-bullishImpulse = showZones and volumeImpulse and rangeImpulse and close > open and close > regme
-bearishImpulse = showZones and volumeImpulse and rangeImpulse and close < open and close < regme
-
-var array<float> demandTops = array.new<float>()
-var array<float> demandBottoms = array.new<float>()
-var array<int>   demandBirth = array.new<int>()
-var array<bool>  demandTouched = array.new<bool>()
-var array<box>   demandBoxes = array.new<box>()
-var array<float> supplyTops = array.new<float>()
-var array<float> supplyBottoms = array.new<float>()
-var array<int>   supplyBirth = array.new<int>()
-var array<bool>  supplyTouched = array.new<bool>()
-var array<box>   supplyBoxes = array.new<box>()
-
-if bullishImpulse
-    zTop = math.min(open, close)
-    array.push(demandTops, zTop)
-    array.push(demandBottoms, low)
-    array.push(demandBirth, bar_index)
-    array.push(demandTouched, false)
-    box dBoxNew = showZones and priceAboveRegme ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 30), bgcolor = color.new(bullColor, 92), border_width = 1) : na
-    array.push(demandBoxes, dBoxNew)
-    if array.size(demandTops) > maxZones
-        box.delete(array.shift(demandBoxes))
-        array.shift(demandTops)
-        array.shift(demandBottoms)
-        array.shift(demandBirth)
-        array.shift(demandTouched)
-
-if bearishImpulse
-    zBottom = math.max(open, close)
-    array.push(supplyTops, high)
-    array.push(supplyBottoms, zBottom)
-    array.push(supplyBirth, bar_index)
-    array.push(supplyTouched, false)
-    box sBoxNew = showZones and not priceAboveRegme ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 30), bgcolor = color.new(bearColor, 92), border_width = 1) : na
-    array.push(supplyBoxes, sBoxNew)
-    if array.size(supplyTops) > maxZones
-        box.delete(array.shift(supplyBoxes))
-        array.shift(supplyTops)
-        array.shift(supplyBottoms)
-        array.shift(supplyBirth)
-        array.shift(supplyTouched)
-
-if array.size(demandTops) > 0
-    for i = 0 to array.size(demandTops) - 1
-        top = array.get(demandTops, i)
-        bottom = array.get(demandBottoms, i)
-        birth = array.get(demandBirth, i)
-        wasTested = array.get(demandTouched, i)
-        broken = close < bottom or bar_index - birth > zoneAgeMax
-        inZone = low <= top and high >= bottom
-        tested = broken or wasTested ? wasTested : inZone and bar_index > birth
-        if tested
-            array.set(demandTouched, i, true)
-        box dB = array.get(demandBoxes, i)
-        keepD = showZones and not na(dB) and not broken
-        if broken and not na(dB)
-            box.delete(dB)
-            array.set(demandBoxes, i, na)
-        if keepD and tested
-            box.set_bgcolor(dB, color.new(bullColor, 79))
-            box.set_border_color(dB, color.new(bullColor, 15))
-
-if array.size(supplyTops) > 0
-    for i = 0 to array.size(supplyTops) - 1
-        top = array.get(supplyTops, i)
-        bottom = array.get(supplyBottoms, i)
-        birth = array.get(supplyBirth, i)
-        wasTested = array.get(supplyTouched, i)
-        broken = close > top or bar_index - birth > zoneAgeMax
-        inZone = high >= bottom and low <= top
-        tested = broken or wasTested ? wasTested : inZone and bar_index > birth
-        if tested
-            array.set(supplyTouched, i, true)
-        box sB = array.get(supplyBoxes, i)
-        keepS = showZones and not na(sB) and not broken
-        if broken and not na(sB)
-            box.delete(sB)
-            array.set(supplyBoxes, i, na)
-        if keepS and tested
-            box.set_bgcolor(sB, color.new(bearColor, 79))
-            box.set_border_color(sB, color.new(bearColor, 15))
 
 // ---------- liquidity pools (equal highs = BSL above, equal lows = SSL below) ----------
 liqClusterTop(float[] arr, array<bool> sweptArr, float lvl) =>
