@@ -124,7 +124,7 @@ if bullishImpulse
     array.push(demandBottoms, low)
     array.push(demandBirth, bar_index)
     array.push(demandTouched, false)
-    box dBoxNew = showZones ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 45), bgcolor = color.new(bullColor, 87), border_width = 1) : na
+    box dBoxNew = showZones and priceAboveRegme ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 45), bgcolor = color.new(bullColor, 87), border_width = 1) : na
     array.push(demandBoxes, dBoxNew)
     if array.size(demandTops) > maxZones
         box.delete(array.shift(demandBoxes))
@@ -139,7 +139,7 @@ if bearishImpulse
     array.push(supplyBottoms, zBottom)
     array.push(supplyBirth, bar_index)
     array.push(supplyTouched, false)
-    box sBoxNew = showZones ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 45), bgcolor = color.new(bearColor, 87), border_width = 1) : na
+    box sBoxNew = showZones and not priceAboveRegme ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 45), bgcolor = color.new(bearColor, 87), border_width = 1) : na
     array.push(supplyBoxes, sBoxNew)
     if array.size(supplyTops) > maxZones
         box.delete(array.shift(supplyBoxes))
