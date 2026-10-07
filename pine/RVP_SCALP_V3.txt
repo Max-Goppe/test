@@ -115,7 +115,7 @@ if showLiquidity and not na(high[1]) and bar_index > liqMinBars + 1
     // Detect swing extremes (confirmed after liqMinBars+1 bars, no repaint)
     swingHi = high[liqMinBars + 1] == ta.highest(high, 2 * (liqMinBars + 1) + 1)
     swingLo = low[liqMinBars + 1] == ta.lowest(low, 2 * (liqMinBars + 1) + 1)
-    
+
     // Add new swings to global history
     if swingHi
         array.push(allSwingHi, high[liqMinBars + 1])
@@ -123,7 +123,7 @@ if showLiquidity and not na(high[1]) and bar_index > liqMinBars + 1
     if swingLo
         array.push(allSwingLo, low[liqMinBars + 1])
         array.push(allSwingLoBar, bar_index - liqMinBars - 1)
-    
+
     // Prune old swings beyond lookback window
     while array.size(allSwingHi) > 0 and bar_index - array.get(allSwingHiBar, 0) > liqLookback
         array.shift(allSwingHi)
@@ -131,27 +131,27 @@ if showLiquidity and not na(high[1]) and bar_index > liqMinBars + 1
     while array.size(allSwingLo) > 0 and bar_index - array.get(allSwingLoBar, 0) > liqLookback
         array.shift(allSwingLo)
         array.shift(allSwingLoBar)
-    
+
     // Check each new swing against previous ones to form clusters (pools)
     // For BSL: if current swingHi is close to any earlier swingHi in window -> create/update pool
     if swingHi and array.size(allSwingHi) >= 2
         curLvl = high[liqMinBars + 1]
         // Find if there's another swing high within tolerance
         foundPair = false
-        for h = 0 to array.size(allSwingHi) - 2
-            prevLvl = array.get(allSwingHi, h)
-            if math.abs(prevLvl - curLvl) <= liqTol
-                foundPair := true
-                break
+        for h = 0 to array.size(allSwingHi) - 1
+            if not foundPair
+                prevLvl = array.get(allSwingHi, h)
+                if math.abs(prevLvl - curLvl) <= liqTol and h < array.size(allSwingHi) - 1
+                    foundPair = true
         if foundPair
             // Check if we already have an active unswept BSL at this level
             alreadyActive = false
             for a = 0 to array.size(bslLevels) - 1
-                exLvl = array.get(bslLevels, a)
-                exSwept = array.get(bslSwept, a)
-                if not exSwept and math.abs(exLvl - curLvl) <= liqTol
-                    alreadyActive := true
-                    break
+                if not alreadyActive
+                    exLvl = array.get(bslLevels, a)
+                    exSwept = array.get(bslSwept, a)
+                    if not exSwept and math.abs(exLvl - curLvl) <= liqTol
+                        alreadyActive = true
             if not alreadyActive
                 // Create new BSL zone
                 line ln = line.new(bar_index - liqMinBars - 1, curLvl, bar_index + liqExtend, curLvl, extend = extend.right, color = color.new(liqBullColor, 60), style = line.style_dashed, width = 1)
@@ -172,24 +172,24 @@ if showLiquidity and not na(high[1]) and bar_index > liqMinBars + 1
                     array.shift(bslLevels)
                     array.shift(bslBirth)
                     array.shift(bslSwept)
-    
+
     // For SSL: same logic with swing lows
     if swingLo and array.size(allSwingLo) >= 2
         curLvl2 = low[liqMinBars + 1]
         foundPair2 = false
-        for l = 0 to array.size(allSwingLo) - 2
-            prevLvl2 = array.get(allSwingLo, l)
-            if math.abs(prevLvl2 - curLvl2) <= liqTol
-                foundPair2 := true
-                break
+        for l = 0 to array.size(allSwingLo) - 1
+            if not foundPair2
+                prevLvl2 = array.get(allSwingLo, l)
+                if math.abs(prevLvl2 - curLvl2) <= liqTol and l < array.size(allSwingLo) - 1
+                    foundPair2 = true
         if foundPair2
             alreadyActive2 = false
             for a2 = 0 to array.size(sslLevels) - 1
-                exLvl2 = array.get(sslLevels, a2)
-                exSwept2 = array.get(sslSwept, a2)
-                if not exSwept2 and math.abs(exLvl2 - curLvl2) <= liqTol
-                    alreadyActive2 := true
-                    break
+                if not alreadyActive2
+                    exLvl2 = array.get(sslLevels, a2)
+                    exSwept2 = array.get(sslSwept, a2)
+                    if not exSwept2 and math.abs(exLvl2 - curLvl2) <= liqTol
+                        alreadyActive2 = true
             if not alreadyActive2
                 line ln2 = line.new(bar_index - liqMinBars - 1, curLvl2, bar_index + liqExtend, curLvl2, extend = extend.right, color = color.new(liqBearColor, 60), style = line.style_dashed, width = 1)
                 label lb2 = label.new(bar_index - liqMinBars - 1, curLvl2, "SSL", xloc = xloc.bar_index, yloc = yloc.price, color = color.new(liqBearColor, 85), textcolor = color.new(liqBearColor, 30), style = label.style_label_up, size = size.tiny)
