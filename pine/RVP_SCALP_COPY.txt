@@ -243,11 +243,11 @@ inCooldown = lastSignalBar > 0 and bar_index - lastSignalBar <= cooldownBars
 // ---------- session windows (server time): only two active windows give positive expectancy on GOLD ----------
 // NOTE: the old timezone-based hour call was invalid in Pine v6 (CE10272); server hours are now computed as UTC hour + manual offset.
 srvOffsetH = input.int(3, "Часовой сдвиг сервера (ч)", minval = -12, maxval = 14, group = groupSession, tooltip = "Смещение времени вашего MT5/TradingView-сервера относительно UTC. Для типичного GMT+3 сервера = 3.")
-barHour = hour(time, "GMT") + srvOffsetH
-barHour = barHour >= 24 ? barHour - 24 : barHour < 0 ? barHour + 24 : barHour
-inEuropeWin = sessEurope and barHour >= 9 and barHour < 13
-inUsWin = sessUs and barHour >= 15 and barHour < 19
-inCustomWin = sessCustomFrom >= 0 and (sessCustomFrom <= sessCustomTo ? (barHour >= sessCustomFrom and barHour < sessCustomTo + 1) : (barHour >= sessCustomFrom or barHour < sessCustomTo + 1))
+srvHourRaw = hour(time, "GMT") + srvOffsetH
+srvHour = srvHourRaw >= 24 ? srvHourRaw - 24 : srvHourRaw < 0 ? srvHourRaw + 24 : srvHourRaw
+inEuropeWin = sessEurope and srvHour >= 9 and srvHour < 13
+inUsWin = sessUs and srvHour >= 15 and srvHour < 19
+inCustomWin = sessCustomFrom >= 0 and (sessCustomFrom <= sessCustomTo ? (srvHour >= sessCustomFrom and srvHour < sessCustomTo + 1) : (srvHour >= sessCustomFrom or srvHour < sessCustomTo + 1))
 inSession = not useSessionFilter or inEuropeWin or inUsWin or inCustomWin
 sessionTxt = inEuropeWin ? "Европа 09-13" : inUsWin ? "США 15-19" : inCustomWin ? "своё окно" : "вне окон — сигналы выключены"
 
