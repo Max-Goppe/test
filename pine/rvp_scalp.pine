@@ -88,10 +88,18 @@ regme = ta.ema(vwmaPrice, regmeSmooth)
 priceAboveRegme = close >= regme
 plot(regme, "REGME trend", color = priceAboveRegme ? bullColor : bearColor, linewidth = 4)
 
-// ---------- liquidity pools (clustered highs = BSL above, clustered lows = SSL below) ----------
-// Cluster tolerance: ATR-based (liqTolMult), with a minimum of one mintick so levels never collapse.
+// ---------- liquidity pools (BSL / SSL) ----------
+// Strategy: collect ALL recent swing highs/lows in arrays; when two or more sit within ATR tolerance -> pool zone appears.
+// This avoids strict-equality requirement and makes zones appear even on noisy M5 gold.
 liqTol = math.max(atr * liqTolMult, syminfo.mintick)
 
+// Temporary storage of all swing extremes (level, birth bar)
+var array<float> allSwingHi = array.new<float>()
+var array<int>   allSwingHiBar = array.new<int>()
+var array<float> allSwingLo = array.new<float>()
+var array<int>   allSwingLoBar = array.new<int>()
+
+// Active liquidity pools (level, birth, swept flag, lines, labels)
 var array<float> bslLevels = array.new<float>()
 var array<int>   bslBirth = array.new<int>()
 var array<bool>  bslSwept = array.new<bool>()
@@ -104,70 +112,102 @@ var array<line>  sslLines = array.new<line>()
 var array<label> sslLabels = array.new<label>()
 
 if showLiquidity and not na(high[1]) and bar_index > liqMinBars + 1
-    // Swing high/low: local extremum confirmed after liqMinBars+1 bars (no repaint: level taken from history).
-    tol = liqTol
+    // Detect swing extremes (confirmed after liqMinBars+1 bars, no repaint)
     swingHi = high[liqMinBars + 1] == ta.highest(high, 2 * (liqMinBars + 1) + 1)
     swingLo = low[liqMinBars + 1] == ta.lowest(low, 2 * (liqMinBars + 1) + 1)
-    // Clustered (not strictly equal) extremes within ATR tolerance over the lookback window.
-    // Explicit loops only — no lambdas, no custom functions (max parser compatibility).
-    eqHigh = false
-    dupTopB = false
-    if swingHi and array.size(bslLevels) > 0
-        for j = 0 to array.size(bslLevels) - 1
-            lj = array.get(bslLevels, j)
-            sj = array.get(bslSwept, j)
-            if not na(lj) and math.abs(lj - high[liqMinBars + 1]) <= tol
-                eqHigh := true
-                if not sj
-                    dupTopB := true
-    eqLow = false
-    dupTopS = false
-    if swingLo and array.size(sslLevels) > 0
-        for k = 0 to array.size(sslLevels) - 1
-            lk = array.get(sslLevels, k)
-            sk = array.get(sslSwept, k)
-            if not na(lk) and math.abs(lk - low[liqMinBars + 1]) <= tol
-                eqLow := true
-                if not sk
-                    dupTopS := true
-    if swingHi and eqHigh and not dupTopB
-        lvl = high[liqMinBars + 1]
-        line ln = line.new(bar_index - liqMinBars - 1, lvl, bar_index + liqExtend, lvl, extend = extend.right, color = color.new(liqBullColor, 45), style = line.style_dashed, width = 1)
-        label lb = label.new(bar_index - liqMinBars - 1, lvl, "BSL", xloc = xloc.bar_index, yloc = yloc.price, color = color.new(liqBullColor, 85), textcolor = color.new(liqBullColor, 20), style = label.style_label_down, size = size.tiny)
-        array.push(bslLevels, lvl)
-        array.push(bslBirth, bar_index)
-        array.push(bslSwept, false)
-        array.push(bslLines, ln)
-        array.push(bslLabels, lb)
-        if array.size(bslLevels) > liqMaxZones
-            oldLn = array.shift(bslLines)
-            oldLb = array.shift(bslLabels)
-            if not na(oldLn)
-                line.delete(oldLn)
-            if not na(oldLb)
-                label.delete(oldLb)
-            array.shift(bslLevels)
-            array.shift(bslBirth)
-            array.shift(bslSwept)
-    if swingLo and eqLow and not dupTopS
-        lvl2 = low[liqMinBars + 1]
-        line ln2 = line.new(bar_index - liqMinBars - 1, lvl2, bar_index + liqExtend, lvl2, extend = extend.right, color = color.new(liqBearColor, 45), style = line.style_dashed, width = 1)
-        label lb2 = label.new(bar_index - liqMinBars - 1, lvl2, "SSL", xloc = xloc.bar_index, yloc = yloc.price, color = color.new(liqBearColor, 85), textcolor = color.new(liqBearColor, 20), style = label.style_label_up, size = size.tiny)
-        array.push(sslLevels, lvl2)
-        array.push(sslBirth, bar_index)
-        array.push(sslSwept, false)
-        array.push(sslLines, ln2)
-        array.push(sslLabels, lb2)
-        if array.size(sslLevels) > liqMaxZones
-            oldLn2 = array.shift(sslLines)
-            oldLb2 = array.shift(sslLabels)
-            if not na(oldLn2)
-                line.delete(oldLn2)
-            if not na(oldLb2)
-                label.delete(oldLb2)
-            array.shift(sslLevels)
-            array.shift(sslBirth)
-            array.shift(sslSwept)
+    
+    // Add new swings to global history
+    if swingHi
+        array.push(allSwingHi, high[liqMinBars + 1])
+        array.push(allSwingHiBar, bar_index - liqMinBars - 1)
+    if swingLo
+        array.push(allSwingLo, low[liqMinBars + 1])
+        array.push(allSwingLoBar, bar_index - liqMinBars - 1)
+    
+    // Prune old swings beyond lookback window
+    while array.size(allSwingHi) > 0 and bar_index - array.get(allSwingHiBar, 0) > liqLookback
+        array.shift(allSwingHi)
+        array.shift(allSwingHiBar)
+    while array.size(allSwingLo) > 0 and bar_index - array.get(allSwingLoBar, 0) > liqLookback
+        array.shift(allSwingLo)
+        array.shift(allSwingLoBar)
+    
+    // Check each new swing against previous ones to form clusters (pools)
+    // For BSL: if current swingHi is close to any earlier swingHi in window -> create/update pool
+    if swingHi and array.size(allSwingHi) >= 2
+        curLvl = high[liqMinBars + 1]
+        // Find if there's another swing high within tolerance
+        foundPair = false
+        for h = 0 to array.size(allSwingHi) - 2
+            prevLvl = array.get(allSwingHi, h)
+            if math.abs(prevLvl - curLvl) <= liqTol
+                foundPair := true
+                break
+        if foundPair
+            // Check if we already have an active unswept BSL at this level
+            alreadyActive = false
+            for a = 0 to array.size(bslLevels) - 1
+                exLvl = array.get(bslLevels, a)
+                exSwept = array.get(bslSwept, a)
+                if not exSwept and math.abs(exLvl - curLvl) <= liqTol
+                    alreadyActive := true
+                    break
+            if not alreadyActive
+                // Create new BSL zone
+                line ln = line.new(bar_index - liqMinBars - 1, curLvl, bar_index + liqExtend, curLvl, extend = extend.right, color = color.new(liqBullColor, 60), style = line.style_dashed, width = 1)
+                label lb = label.new(bar_index - liqMinBars - 1, curLvl, "BSL", xloc = xloc.bar_index, yloc = yloc.price, color = color.new(liqBullColor, 85), textcolor = color.new(liqBullColor, 30), style = label.style_label_down, size = size.tiny)
+                array.push(bslLevels, curLvl)
+                array.push(bslBirth, bar_index)
+                array.push(bslSwept, false)
+                array.push(bslLines, ln)
+                array.push(bslLabels, lb)
+                // Limit max zones
+                if array.size(bslLevels) > liqMaxZones
+                    oldLn = array.shift(bslLines)
+                    oldLb = array.shift(bslLabels)
+                    if not na(oldLn)
+                        line.delete(oldLn)
+                    if not na(oldLb)
+                        label.delete(oldLb)
+                    array.shift(bslLevels)
+                    array.shift(bslBirth)
+                    array.shift(bslSwept)
+    
+    // For SSL: same logic with swing lows
+    if swingLo and array.size(allSwingLo) >= 2
+        curLvl2 = low[liqMinBars + 1]
+        foundPair2 = false
+        for l = 0 to array.size(allSwingLo) - 2
+            prevLvl2 = array.get(allSwingLo, l)
+            if math.abs(prevLvl2 - curLvl2) <= liqTol
+                foundPair2 := true
+                break
+        if foundPair2
+            alreadyActive2 = false
+            for a2 = 0 to array.size(sslLevels) - 1
+                exLvl2 = array.get(sslLevels, a2)
+                exSwept2 = array.get(sslSwept, a2)
+                if not exSwept2 and math.abs(exLvl2 - curLvl2) <= liqTol
+                    alreadyActive2 := true
+                    break
+            if not alreadyActive2
+                line ln2 = line.new(bar_index - liqMinBars - 1, curLvl2, bar_index + liqExtend, curLvl2, extend = extend.right, color = color.new(liqBearColor, 60), style = line.style_dashed, width = 1)
+                label lb2 = label.new(bar_index - liqMinBars - 1, curLvl2, "SSL", xloc = xloc.bar_index, yloc = yloc.price, color = color.new(liqBearColor, 85), textcolor = color.new(liqBearColor, 30), style = label.style_label_up, size = size.tiny)
+                array.push(sslLevels, curLvl2)
+                array.push(sslBirth, bar_index)
+                array.push(sslSwept, false)
+                array.push(sslLines, ln2)
+                array.push(sslLabels, lb2)
+                if array.size(sslLevels) > liqMaxZones
+                    oldLn2 = array.shift(sslLines)
+                    oldLb2 = array.shift(sslLabels)
+                    if not na(oldLn2)
+                        line.delete(oldLn2)
+                    if not na(oldLb2)
+                        label.delete(oldLb2)
+                    array.shift(sslLevels)
+                    array.shift(sslBirth)
+                    array.shift(sslSwept)
 
 // Sweep detection: price beyond the pool level = liquidity taken -> mark swept, recolor.
 // intra-bar (default): wick crossing counts (high > BSL / low < SSL); otherwise close-based only.
