@@ -98,12 +98,16 @@ liqTol() =>
     raw = atr * liqTolMult
     math.max(raw, syminfo.mintick)
 
-liqClusterTop(float[] arr, array<bool> sweptArr, float lvl, float tol) =>
+// Returns true if an unswept pool level within +/-tol of lvl already exists.
+// NOTE: no typed function params here (float[] / array<bool> in signatures caused CE10156 on some parsers).
+liqClusterTop(levels, sweptFlags, lvl, tol) =>
     found = false
-    n = array.size(arr)
+    n = array.size(sweptFlags)
     if n > 0
         for i = 0 to n - 1
-            if not array.get(sweptArr, i) and math.abs(array.get(arr, i) - lvl) <= tol
+            lv = array.get(levels, i)
+            sw = array.get(sweptFlags, i)
+            if not sw and not na(lv) and math.abs(lv - lvl) <= tol
                 found := true
     found
 
@@ -124,8 +128,19 @@ if showLiquidity and not na(high[1]) and bar_index > liqMinBars + 1
     swingHi = high[liqMinBars + 1] == ta.highest(high, 2 * (liqMinBars + 1) + 1)
     swingLo = low[liqMinBars + 1] == ta.lowest(low, 2 * (liqMinBars + 1) + 1)
     // Clustered (not strictly equal) extremes within ATR tolerance over the lookback window.
-    eqHigh = swingHi ? (bslLevels.size() > 0 and bslLevels.some(l => not na(l) and math.abs(l - high[liqMinBars + 1]) <= tol)) : false
-    eqLow = swingLo ? (sslLevels.size() > 0 and sslLevels.some(l => not na(l) and math.abs(l - low[liqMinBars + 1]) <= tol)) : false
+    // Manual loop instead of array.some(lambda) — avoids lambda-parsing issues on some Pine versions.
+    eqHigh = false
+    if swingHi and array.size(bslLevels) > 0
+        for j = 0 to array.size(bslLevels) - 1
+            lj = array.get(bslLevels, j)
+            if not na(lj) and math.abs(lj - high[liqMinBars + 1]) <= tol
+                eqHigh := true
+    eqLow = false
+    if swingLo and array.size(sslLevels) > 0
+        for k = 0 to array.size(sslLevels) - 1
+            lk = array.get(sslLevels, k)
+            if not na(lk) and math.abs(lk - low[liqMinBars + 1]) <= tol
+                eqLow := true
     if swingHi and eqHigh and not liqClusterTop(bslLevels, bslSwept, high[liqMinBars + 1], tol)
         lvl = high[liqMinBars + 1]
         line ln = line.new(bar_index - liqMinBars - 1, lvl, bar_index + liqExtend, lvl, extend = extend.right, color = color.new(liqBullColor, 45), style = line.style_dashed, width = 1)
