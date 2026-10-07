@@ -60,6 +60,13 @@ vdoBandMult = input.float(1.35, "VDO band width", minval = 0.5, step = 0.05, gro
 breakoutLookback = input.int(3, "VDO breakout valid N bars", minval = 1, maxval = 10, group = groupSignal)
 cooldownIn = input.int(0, "Signal cooldown bars (0 = auto)", minval = 0, maxval = 30, group = groupSignal, tooltip = "Auto: M1=4, M5=6, others=8")
 
+groupSession = "Торговые окна (время сервера)"
+useSessionFilter = input.bool(true, "Фильтровать сигналы по сессиям", group = groupSession, tooltip = "Backtest GOLD M5 2022-2026: Europe 09-13 and US 15-19 server hours give the best signal quality; Asia/overnight - worst.")
+sessEurope = input.bool(true, "Окно 1: Европа 09:00-13:00", group = groupSession)
+sessUs = input.bool(true, "Окно 2: США 15:00-19:00", group = groupSession)
+sessCustomFrom = input.int(-1, "Своё окно: час от (-1 = выкл)", minval = -1, maxval = 23, group = groupSession)
+sessCustomTo = input.int(23, "Своё окно: час до", minval = 0, maxval = 23, group = groupSession)
+
 groupVisuals = "Visuals"
 showTable = input.bool(true, "Show status table", group = groupVisuals)
 tableCorner = input.string("Верх справа", "Позиция таблицы", options = ["Верх слева", "Верх справа", "Низ слева", "Низ справа"], group = groupVisuals)
@@ -124,7 +131,7 @@ if bullishImpulse
     array.push(demandBottoms, low)
     array.push(demandBirth, bar_index)
     array.push(demandTouched, false)
-    box dBoxNew = showZones ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 45), bgcolor = color.new(bullColor, 87), border_width = 1) : na
+    box dBoxNew = showZones and priceAboveRegme ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 45), bgcolor = color.new(bullColor, 87), border_width = 1) : na
     array.push(demandBoxes, dBoxNew)
     if array.size(demandTops) > maxZones
         box.delete(array.shift(demandBoxes))
@@ -139,7 +146,7 @@ if bearishImpulse
     array.push(supplyBottoms, zBottom)
     array.push(supplyBirth, bar_index)
     array.push(supplyTouched, false)
-    box sBoxNew = showZones ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 45), bgcolor = color.new(bearColor, 87), border_width = 1) : na
+    box sBoxNew = showZones and not priceAboveRegme ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 45), bgcolor = color.new(bearColor, 87), border_width = 1) : na
     array.push(supplyBoxes, sBoxNew)
     if array.size(supplyTops) > maxZones
         box.delete(array.shift(supplyBoxes))
@@ -232,8 +239,17 @@ sellSetup = bearAligned and not priceAboveRegme and freshSupplyTouch and sellCom
 
 var int lastSignalBar = 0
 inCooldown = lastSignalBar > 0 and bar_index - lastSignalBar <= cooldownBars
-buySignal = buySetup and not inCooldown
-sellSignal = sellSetup and not inCooldown
+
+// ---------- session windows (server time): only two active windows give positive expectancy on GOLD ----------
+barHour = hour(time, timeframe.timezone)
+inEuropeWin = sessEurope and barHour >= 9 and barHour < 13
+inUsWin = sessUs and barHour >= 15 and barHour < 19
+inCustomWin = sessCustomFrom >= 0 and (sessCustomFrom <= sessCustomTo ? (barHour >= sessCustomFrom and barHour < sessCustomTo + 1) : (barHour >= sessCustomFrom or barHour < sessCustomTo + 1))
+inSession = not useSessionFilter or inEuropeWin or inUsWin or inCustomWin
+sessionTxt = inEuropeWin ? "Европа 09-13" : inUsWin ? "США 15-19" : inCustomWin ? "своё окно" : "вне окон — сигналы выключены"
+
+buySignal = buySetup and not inCooldown and inSession
+sellSignal = sellSetup and not inCooldown and inSession
 if buySignal or sellSignal
     lastSignalBar := bar_index
 
@@ -241,7 +257,7 @@ if buySignal or sellSignal
 
 // ---------- status table (Russian) ----------
 cornerPos = tableCorner == "Верх слева" ? position.top_left : tableCorner == "Низ слева" ? position.bottom_left : tableCorner == "Низ справа" ? position.bottom_right : position.top_right
-var table panel = table.new(cornerPos, 2, 8, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
+var table panel = table.new(cornerPos, 2, 9, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.new(color.gray, 70))
 
 tfRu(tf) =>
     tf == "D" ? "Д1" : tf == "240" ? "4ч" : tf == "60" ? "1ч" : tf == "15" ? "15м" : tf == "5" ? "5м" : tf == "3" ? "3м" : tf == "1" ? "1м" : tf
@@ -280,6 +296,8 @@ if showTable and barstate.islast
     table.cell(panel, 1, 6, zoneTxt + " | VDO " + str.tostring(vdo, "#.#"), text_color = color.white, text_size = size.small)
     table.cell(panel, 0, 7, "Готовность", text_color = color.silver, text_size = size.small)
     table.cell(panel, 1, 7, readyTxt, text_color = readyCol, text_size = size.small)
+    table.cell(panel, 0, 8, "Торговое окно", text_color = color.silver, text_size = size.small)
+    table.cell(panel, 1, 8, sessionTxt + (useSessionFilter ? "" : " (фильтр выкл)"), text_color = inEuropeWin or inUsWin or inCustomWin or not useSessionFilter ? color.white : color.gray, text_size = size.small)
 
 alertcondition(buySignal, "SCALP BUY", "Scalp BUY {{ticker}} {{interval}} price {{close}}")
 alertcondition(sellSignal, "SCALP SELL", "Scalp SELL {{ticker}} {{interval}} price {{close}}")
