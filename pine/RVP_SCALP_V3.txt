@@ -94,19 +94,7 @@ plot(regme, "REGME trend", color = priceAboveRegme ? bullColor : bearColor, line
 
 // ---------- liquidity pools (clustered highs = BSL above, clustered lows = SSL below) ----------
 // Cluster tolerance: ATR-based (liqTolMult), with a minimum of one mintick so levels never collapse.
-// NOTE: plain expressions only — multi-line "=>" function bodies are not valid in Pine v6 (CE10156).
 liqTol = math.max(atr * liqTolMult, syminfo.mintick)
-
-// Returns true if an unswept pool level within +/-tol of lvl already exists (explicit loop, no lambdas).
-liqClusterTop(levels, sweptFlags, lvl, tol) =>
-    found = false
-    n = array.size(sweptFlags)
-    for i = 0 to n - 1
-        lv = array.get(levels, i)
-        sw = array.get(sweptFlags, i)
-        if not sw and not na(lv) and math.abs(lv - lvl) <= tol
-            found := true
-    found
 
 var array<float> bslLevels = array.new<float>()
 var array<int>   bslBirth = array.new<int>()
@@ -125,20 +113,28 @@ if showLiquidity and not na(high[1]) and bar_index > liqMinBars + 1
     swingHi = high[liqMinBars + 1] == ta.highest(high, 2 * (liqMinBars + 1) + 1)
     swingLo = low[liqMinBars + 1] == ta.lowest(low, 2 * (liqMinBars + 1) + 1)
     // Clustered (not strictly equal) extremes within ATR tolerance over the lookback window.
-    // Manual loop instead of array.some(lambda) — avoids lambda-parsing issues on some Pine versions.
+    // Explicit loops only — no lambdas, no custom functions (max parser compatibility).
     eqHigh = false
+    dupTopB = false
     if swingHi and array.size(bslLevels) > 0
         for j = 0 to array.size(bslLevels) - 1
             lj = array.get(bslLevels, j)
+            sj = array.get(bslSwept, j)
             if not na(lj) and math.abs(lj - high[liqMinBars + 1]) <= tol
                 eqHigh := true
+                if not sj
+                    dupTopB := true
     eqLow = false
+    dupTopS = false
     if swingLo and array.size(sslLevels) > 0
         for k = 0 to array.size(sslLevels) - 1
             lk = array.get(sslLevels, k)
+            sk = array.get(sslSwept, k)
             if not na(lk) and math.abs(lk - low[liqMinBars + 1]) <= tol
                 eqLow := true
-    if swingHi and eqHigh and not liqClusterTop(bslLevels, bslSwept, high[liqMinBars + 1], tol)
+                if not sk
+                    dupTopS := true
+    if swingHi and eqHigh and not dupTopB
         lvl = high[liqMinBars + 1]
         line ln = line.new(bar_index - liqMinBars - 1, lvl, bar_index + liqExtend, lvl, extend = extend.right, color = color.new(liqBullColor, 45), style = line.style_dashed, width = 1)
         label lb = label.new(bar_index - liqMinBars - 1, lvl, "BSL", xloc = xloc.bar_index, yloc = yloc.price, color = color.new(liqBullColor, 85), textcolor = color.new(liqBullColor, 20), style = label.style_label_down, size = size.tiny)
@@ -157,7 +153,7 @@ if showLiquidity and not na(high[1]) and bar_index > liqMinBars + 1
             array.shift(bslLevels)
             array.shift(bslBirth)
             array.shift(bslSwept)
-    if swingLo and eqLow and not liqClusterTop(sslLevels, sslSwept, low[liqMinBars + 1], tol)
+    if swingLo and eqLow and not dupTopS
         lvl2 = low[liqMinBars + 1]
         line ln2 = line.new(bar_index - liqMinBars - 1, lvl2, bar_index + liqExtend, lvl2, extend = extend.right, color = color.new(liqBearColor, 45), style = line.style_dashed, width = 1)
         label lb2 = label.new(bar_index - liqMinBars - 1, lvl2, "SSL", xloc = xloc.bar_index, yloc = yloc.price, color = color.new(liqBearColor, 85), textcolor = color.new(liqBearColor, 20), style = label.style_label_up, size = size.tiny)
