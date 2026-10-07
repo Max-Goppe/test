@@ -41,7 +41,9 @@ volMultBig    = input.float(2.0, "Vol multiplier (confirm/trend TF)", minval = 0
 minBodyAtrIn = input.float(0.0, "Min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupCore, tooltip = "Auto: M5/M15=0.50, M1=0.85")
 
 groupZones = "Zones (entry TF)"
-showZones = input.bool(true, "Show dynamic zones", group = groupZones)
+showZones = input.bool(true, "Show dynamic zones", group = groupZones, tooltip = "Зоны рисуются только на импульсных барах: объём выше нормы И тело свечи >= ATR*множитель И close за линией REGME. Если импульсов нет — зон на графике нет.")
+zoneVolMultIn = input.float(0.0, "Zone impulse vol multiplier (0 = auto)", minval = 0.0, step = 0.1, group = groupZones, tooltip = "Множитель объёма для появления зоны. Auto по ТФ графика: M1=1.8, M5/M15=2.0. Меньше значение — больше зон.")
+zoneBodyAtrIn = input.float(0.0, "Zone impulse min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupZones, tooltip = "Минимальное тело свечи (в ATR) для появления зоны. Auto: M1=0.85, M5/M15=0.50. Меньше значение — больше зон.")
 maxZonesIn = input.int(0, "Max zones per side (0 = auto)", minval = 0, maxval = 20, group = groupZones, tooltip = "Auto: M1=12, others=16")
 zoneExtendIn = input.int(0, "Zone projection bars (0 = auto)", minval = 0, maxval = 300, group = groupZones, tooltip = "Auto: M1=90, M5=120, others=150")
 zoneAgeMaxIn = input.int(0, "Zone age limit bars (0 = auto)", minval = 0, maxval = 200, group = groupZones, tooltip = "How long an untouched zone stays alive waiting for its first touch. Auto: M1=24, M5=40, M15=60.")
@@ -72,6 +74,8 @@ minBodyAtr     = minBodyAtrIn > 0 ? minBodyAtrIn : cfgMinBodyAtr
 maxZones       = maxZonesIn > 0 ? maxZonesIn : cfgMaxZones
 zoneExtendBars = zoneExtendIn > 0 ? zoneExtendIn : cfgZoneExtend
 zoneAgeMax     = zoneAgeMaxIn > 0 ? zoneAgeMaxIn : cfgZoneAge
+zoneVolMult    = zoneVolMultIn > 0 ? zoneVolMultIn : cfgVolMult
+zoneBodyAtr    = zoneBodyAtrIn > 0 ? zoneBodyAtrIn : cfgMinBodyAtr
 
 [eStrBullE, eStrBearE] = request.security(syminfo.tickerid, entryTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
 [cStrBullC, cStrBearC] = request.security(syminfo.tickerid, confirmTf, [close > ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth), close < ta.ema(ta.vwma(hlc3, regmeLength), regmeSmooth)], lookahead = barmerge.lookahead_off)
@@ -93,8 +97,8 @@ priceAboveRegme = close >= regme
 plot(regme, "REGME trend", color = priceAboveRegme ? bullColor : bearColor, linewidth = 4)
 
 volBase = ta.sma(vol, volumeBaseLen)
-volumeImpulse = volBase > 0 and vol > volBase * volMultEntry
-rangeImpulse = atr > 0 and math.abs(close - open) >= atr * minBodyAtr and (high - low) >= atr * 0.9
+volumeImpulse = volBase > 0 and vol > volBase * zoneVolMult
+rangeImpulse = atr > 0 and math.abs(close - open) >= atr * zoneBodyAtr and (high - low) >= atr * 0.9
 
 bullishImpulse = showZones and volumeImpulse and rangeImpulse and close > open and close > regme
 bearishImpulse = showZones and volumeImpulse and rangeImpulse and close < open and close < regme
@@ -116,7 +120,7 @@ if bullishImpulse
     array.push(demandBottoms, low)
     array.push(demandBirth, bar_index)
     array.push(demandTouched, false)
-    box dBoxNew = showZones and priceAboveRegme ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 45), bgcolor = color.new(bullColor, 87), border_width = 1) : na
+    box dBoxNew = showZones and priceAboveRegme ? box.new(bar_index, zTop, bar_index + zoneExtendBars, low, extend = extend.right, border_color = color.new(bullColor, 30), bgcolor = color.new(bullColor, 92), border_width = 1) : na
     array.push(demandBoxes, dBoxNew)
     if array.size(demandTops) > maxZones
         box.delete(array.shift(demandBoxes))
@@ -131,7 +135,7 @@ if bearishImpulse
     array.push(supplyBottoms, zBottom)
     array.push(supplyBirth, bar_index)
     array.push(supplyTouched, false)
-    box sBoxNew = showZones and not priceAboveRegme ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 45), bgcolor = color.new(bearColor, 87), border_width = 1) : na
+    box sBoxNew = showZones and not priceAboveRegme ? box.new(bar_index, high, bar_index + zoneExtendBars, zBottom, extend = extend.right, border_color = color.new(bearColor, 30), bgcolor = color.new(bearColor, 92), border_width = 1) : na
     array.push(supplyBoxes, sBoxNew)
     if array.size(supplyTops) > maxZones
         box.delete(array.shift(supplyBoxes))
