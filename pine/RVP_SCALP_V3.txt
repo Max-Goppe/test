@@ -38,10 +38,6 @@ volMultBig    = input.float(2.0, "Vol multiplier (confirm/trend TF)", minval = 0
 minBodyAtrIn = input.float(0.0, "Min body / ATR (0 = auto)", minval = 0.0, step = 0.05, group = groupCore, tooltip = "Auto: M5/M15=0.50, M1=0.85")
 
 
-groupSignal = "VDO (объёмное давление)"
-vdoLength = input.int(14, "VDO length", minval = 2, group = groupSignal)
-vdoSigLen = input.int(8, "VDO signal length", minval = 1, group = groupSignal)
-
 groupSession = "Торговые окна (время Екатеринбурга, UTC+5)"
 useSessionFilter = input.bool(true, "Подсвечивать торговое окно в таблице", group = groupSession, tooltip = "Строка «Торговое окно» в таблице: зелёный — торгуем (Европа 11-15, США 17-21 ЕКБ), красный — вне окон. Backtest GOLD M5 2022-2026: эти два окна дают лучшее качество движения; азия/ночь - худшее.")
 sessEurope = input.bool(true, "Окно 1: Европа 11:00-15:00 (ЕКБ)", group = groupSession)
@@ -236,13 +232,7 @@ if not liqKeepZones and array.size(sslLevels) > 0
             array.remove(sslBirth, i)
             array.remove(sslSwept, i)
 
-// ---------- VDO on entry TF ----------
-signedVolume = close > close[1] ? vol : close < close[1] ? -vol : 0.0
-totalVolume = ta.ema(vol, vdoLength)
-volumePosition = ta.ema(signedVolume, vdoLength)
-vzo = totalVolume != 0.0 ? 100.0 * volumePosition / totalVolume : 0.0
-vdo = math.max(0.0, math.min(100.0, 50.0 + vzo * 0.5))
-vdoSignalEma = ta.ema(vdo, vdoSigLen)
+// ---------- VDO удалён: сигналы/входы убраны, объёмное давление нигде в индикаторе не используется ----------
 
 // ---------- session windows (yekaterinburg time, UTC+5): only two active windows give positive expectancy on GOLD ----------
 // NOTE: the old timezone-based hour call was invalid in Pine v6 (CE10272); hours are now computed as UTC hour + manual offset.
