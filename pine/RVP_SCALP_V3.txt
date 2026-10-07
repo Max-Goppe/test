@@ -60,12 +60,12 @@ vdoBandMult = input.float(1.35, "VDO band width", minval = 0.5, step = 0.05, gro
 breakoutLookback = input.int(3, "VDO breakout valid N bars", minval = 1, maxval = 10, group = groupSignal)
 cooldownIn = input.int(0, "Signal cooldown bars (0 = auto)", minval = 0, maxval = 30, group = groupSignal, tooltip = "Auto: M1=4, M5=6, others=8")
 
-groupSession = "Торговые окна (время сервера)"
-useSessionFilter = input.bool(true, "Фильтровать сигналы по сессиям", group = groupSession, tooltip = "Backtest GOLD M5 2022-2026: Europe 09-13 and US 15-19 server hours give the best signal quality; Asia/overnight - worst.")
-sessEurope = input.bool(true, "Окно 1: Европа 09:00-13:00", group = groupSession)
-sessUs = input.bool(true, "Окно 2: США 15:00-19:00", group = groupSession)
-sessCustomFrom = input.int(-1, "Своё окно: час от (-1 = выкл)", minval = -1, maxval = 23, group = groupSession)
-sessCustomTo = input.int(23, "Своё окно: час до", minval = 0, maxval = 23, group = groupSession)
+groupSession = "Торговые окна (время Екатеринбурга, UTC+5)"
+useSessionFilter = input.bool(true, "Фильтровать сигналы по сессиям", group = groupSession, tooltip = "Backtest GOLD M5 2022-2026: Europe 11-15 and US 17-21 yekaterinburg time (server GMT+3 + 2h) give the best signal quality; Asia/overnight - worst.")
+sessEurope = input.bool(true, "Окно 1: Европа 11:00-15:00 (ЕКБ)", group = groupSession)
+sessUs = input.bool(true, "Окно 2: США 17:00-21:00 (ЕКБ)", group = groupSession)
+sessCustomFrom = input.int(-1, "Своё окно: час от (-1 = выкл, время ЕКБ)", minval = -1, maxval = 23, group = groupSession)
+sessCustomTo = input.int(23, "Своё окно: час до (время ЕКБ)", minval = 0, maxval = 23, group = groupSession)
 
 groupVisuals = "Visuals"
 showTable = input.bool(true, "Show status table", group = groupVisuals)
@@ -240,16 +240,16 @@ sellSetup = bearAligned and not priceAboveRegme and freshSupplyTouch and sellCom
 var int lastSignalBar = 0
 inCooldown = lastSignalBar > 0 and bar_index - lastSignalBar <= cooldownBars
 
-// ---------- session windows (server time): only two active windows give positive expectancy on GOLD ----------
-// NOTE: the old timezone-based hour call was invalid in Pine v6 (CE10272); server hours are now computed as UTC hour + manual offset.
-srvOffsetH = input.int(3, "Часовой сдвиг сервера (ч)", minval = -12, maxval = 14, group = groupSession, tooltip = "Смещение времени вашего MT5/TradingView-сервера относительно UTC. Для типичного GMT+3 сервера = 3.")
-srvHourRaw = hour(time, "GMT") + srvOffsetH
-srvHour = srvHourRaw >= 24 ? srvHourRaw - 24 : srvHourRaw < 0 ? srvHourRaw + 24 : srvHourRaw
-inEuropeWin = sessEurope and srvHour >= 9 and srvHour < 13
-inUsWin = sessUs and srvHour >= 15 and srvHour < 19
-inCustomWin = sessCustomFrom >= 0 and (sessCustomFrom <= sessCustomTo ? (srvHour >= sessCustomFrom and srvHour < sessCustomTo + 1) : (srvHour >= sessCustomFrom or srvHour < sessCustomTo + 1))
+// ---------- session windows (yekaterinburg time, UTC+5): only two active windows give positive expectancy on GOLD ----------
+// NOTE: the old timezone-based hour call was invalid in Pine v6 (CE10272); hours are now computed as UTC hour + manual offset.
+srvOffsetH = input.int(5, "Часовой сдвиг от UTC (ЕКБ = 5)", minval = -12, maxval = 14, group = groupSession, tooltip = "Смещение вашего часового пояса относительно UTC. Екатеринбург (UTC+5) = 5. Если хотите видеть окна в время сервера MT5 (GMT+3), поставьте 3.")
+ekbHourRaw = hour(time, "GMT") + srvOffsetH
+ekbHour = ekbHourRaw >= 24 ? ekbHourRaw - 24 : ekbHourRaw < 0 ? ekbHourRaw + 24 : ekbHourRaw
+inEuropeWin = sessEurope and ekbHour >= 11 and ekbHour < 15
+inUsWin = sessUs and ekbHour >= 17 and ekbHour < 21
+inCustomWin = sessCustomFrom >= 0 and (sessCustomFrom <= sessCustomTo ? (ekbHour >= sessCustomFrom and ekbHour < sessCustomTo + 1) : (ekbHour >= sessCustomFrom or ekbHour < sessCustomTo + 1))
 inSession = not useSessionFilter or inEuropeWin or inUsWin or inCustomWin
-sessionTxt = inEuropeWin ? "Европа 09-13" : inUsWin ? "США 15-19" : inCustomWin ? "своё окно" : "вне окон — сигналы выключены"
+sessionTxt = inEuropeWin ? "Европа 11-15 ЕКБ" : inUsWin ? "США 17-21 ЕКБ" : inCustomWin ? "своё окно ЕКБ" : "вне окон — сигналы выключены"
 
 buySignal = buySetup and not inCooldown and inSession
 sellSignal = sellSetup and not inCooldown and inSession
