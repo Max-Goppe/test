@@ -1,0 +1,65 @@
+//@version=6
+indicator('TREND LINE H1', 'TREND LINE H1', overlay = true, max_bars_back = 500)
+
+// Единый индикатор на все пары: линия тренда + автокалибровка под инструмент.
+// Параметры подобраны бэктестом по выгрузкам MT5 (GOLD M5 2022-2026 -> H1).
+//  - линия: KAMA (адаптивная средняя) — в импульс идёт за ценой, во флэте замирает;
+//  - канал: +/- полуширина x ATR(100) — ширина автоматически подстраивается под
+//    волатильность инструмента (золото, EURUSD и т.д.) без смены настроек;
+//  - смена тренда только когда close закрепляется за каналом N бар подряд (гистерезис)
+//    — одиночные проколы "туда-сюда" не считаются, «ерша» нет;
+//  - касание линии при подтверждённом тренде = отбой (точка на баре).
+
+grpA = 'Линия (автокалибровка)'
+atrLen   = input.int(100,    'Длина ATR',                 minval = 20,  maxval = 300, group = grpA)
+erLen    = input.int(10,     'KAMA: окно эффективности',  minval = 5,   maxval = 50,  group = grpA)
+kamaFast = input.int(2,      'KAMA fast',                 minval = 1,   maxval = 10,  group = grpA)
+kamaSlow = input.int(30,     'KAMA slow',                 minval = 10,  maxval = 100, group = grpA)
+chanMult = input.float(1.5,  'Полуширина канала (x ATR)', minval = 0.2, maxval = 3.0, step = 0.1, group = grpA)
+bufMult  = input.float(0.25, 'Запас отбоя от линии (x ATR)', minval = 0.0, maxval = 1.0, step = 0.05, group = grpA)
+
+grpB = 'Подтверждение пробоя'
+confBars = input.int(2, 'Баров подряд за каналом', minval = 1, maxval = 10, group = grpB)
+
+colLine   = input.color(color.new(#f0b90b, 0),  'Линия',     group = 'Вид')
+colUp     = input.color(color.new(#089981, 60), 'Зона выше', group = 'Вид')
+colDn     = input.color(color.new(#e04a4a, 60), 'Зона ниже', group = 'Вид')
+showBands = input.bool(true, 'Показывать канал', group = 'Вид')
+
+// --- линия KAMA ---
+atrV = ta.atr(atrLen)
+net  = math.abs(close - close[erLen])
+spd  = math.sum(math.abs(close - close[1]), erLen)
+er   = spd > 0 ? net / spd : 0.0
+sc   = 2.0 / (kamaFast + 1) - 2.0 / (kamaSlow + 1)
+k    = math.pow(er * sc + 2.0 / (kamaSlow + 1), 2)
+var float line_ = na
+line_ := na(line_[1]) ? close : line_[1] + k * (close - line_[1])
+
+upBand = line_ + chanMult * atrV
+dnBand = line_ - chanMult * atrV
+
+// --- состояние тренда: гистерезис Шмитта + подтверждение N барами ---
+var int trend = 0
+var int pend  = 0
+if close < dnBand and trend != -1
+    pend := pend < 0 ? pend - 1 : -1
+else if close > upBand and trend != 1
+    pend := pend > 0 ? pend + 1 : 1
+else
+    pend := 0
+if pend >= confBars
+    trend := 1
+if pend <= -confBars
+    trend := -1
+
+// --- отбой: касание линии (с запасом) при подтверждённом тренде ---
+touchUp = trend == 1  and low  < line_ + bufMult * atrV and close > line_
+touchDn = trend == -1 and high > line_ - bufMult * atrV and close < line_
+
+// --- вывод ---
+plot(showBands ? upBand : na, 'Верх канала', color = colUp, linewidth = 1, style = plot.style_linebr)
+plot(showBands ? dnBand : na, 'Низ канала',  color = colDn, linewidth = 1, style = plot.style_linebr)
+plot(line_,                   'Тренд линия', color = colLine, linewidth = 2)
+plotshape(touchUp, 'Отбой вверх', shape.circle, location.belowbar, color.new(#089981, 0), size = size.tiny)
+plotshape(touchDn, 'Отбой вниз',  shape.circle, location.abovebar, color.new(#e04a4a, 0), size = size.tiny)
