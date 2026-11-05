@@ -1,29 +1,36 @@
 //@version=6
 indicator('TREND LINE H1', 'TREND LINE H1', overlay = true, max_bars_back = 500)
 
-// Единый индикатор на все пары: линия тренда + автокалибровка под инструмент.
-// Параметры подобраны бэктестом по выгрузкам MT5 (GOLD M5 2022-2026 -> H1).
-//  - линия: KAMA (адаптивная средняя) — в импульс идёт за ценой, во флэте замирает;
-//  - канал: +/- полуширина x ATR(100) — ширина автоматически подстраивается под
-//    волатильность инструмента (золото, EURUSD и т.д.) без смены настроек;
-//  - смена тренда только когда close закрепляется за каналом N бар подряд (гистерезис)
-//    — одиночные проколы "туда-сюда" не считаются, «ерша» нет;
-//  - касание линии при подтверждённом тренде = отбой (точка на баре).
+// Единый индикатор на все инструменты: линия тренда + автокалибровка под пару.
+// Параметры подобраны бэктестом по выгрузкам MT5 (H1, 2022-2026):
+// GOLD, EURUSD, GBPUSD, EURGBP, USDCAD — tuning/tune_all_pairs.py.
+// Как это работает:
+//  - линия = KAMA (адаптивная средняя): в импульс идёт за ценой, во флэте замирает;
+//  - канал вокруг линии = +/- множитель x ATR(100): ширина автоматически подстраивается
+//    под волатильность инструмента — при переключении пары настройки менять НЕ нужно;
+//  - смена тренда = close закрепляется за каналом N бар подряд (гистерезис Шмитта):
+//    одиночные проколы туда-сюда не считаются, «ерша» нет;
+//  - касание линии при подтверждённом тренде = возможный отбой (точка на баре);
+//  - цвет линии меняется при подтверждённой смене направления H1 — сигнал торговать
+//    в другую сторону.
+// Наилучший результат теста: chanMult=2.2, confBars=3 => ~40-50 смен тренда/год,
+// ложных разворотов (<12ч) ~0-1 в год на всех пяти инструментах.
 
 grpA = 'Линия (автокалибровка)'
-atrLen   = input.int(100,    'Длина ATR',                 minval = 20,  maxval = 300, group = grpA)
-erLen    = input.int(10,     'KAMA: окно эффективности',  minval = 5,   maxval = 50,  group = grpA)
-kamaFast = input.int(2,      'KAMA fast',                 minval = 1,   maxval = 10,  group = grpA)
-kamaSlow = input.int(30,     'KAMA slow',                 minval = 10,  maxval = 100, group = grpA)
-chanMult = input.float(1.5,  'Полуширина канала (x ATR)', minval = 0.2, maxval = 3.0, step = 0.1, group = grpA)
+atrLen   = input.int(100,    'Длина ATR',                minval = 20,  maxval = 300, group = grpA)
+erLen    = input.int(10,     'KAMA: окно эффективности', minval = 5,   maxval = 50,  group = grpA)
+kamaFast = input.int(2,      'KAMA fast',                minval = 1,   maxval = 10,  group = grpA)
+kamaSlow = input.int(30,     'KAMA slow',                minval = 10,  maxval = 100, group = grpA)
+chanMult = input.float(2.2,  'Полуширина канала (x ATR)', minval = 0.2, maxval = 4.0, step = 0.1, group = grpA)
 bufMult  = input.float(0.25, 'Запас отбоя от линии (x ATR)', minval = 0.0, maxval = 1.0, step = 0.05, group = grpA)
 
 grpB = 'Подтверждение пробоя'
-confBars = input.int(2, 'Баров подряд за каналом', minval = 1, maxval = 10, group = grpB)
+confBars = input.int(3, 'Баров подряд за каналом', minval = 1, maxval = 10, group = grpB)
 
-colLine   = input.color(color.new(#f0b90b, 0),  'Линия',     group = 'Вид')
-colUp     = input.color(color.new(#089981, 60), 'Зона выше', group = 'Вид')
-colDn     = input.color(color.new(#e04a4a, 60), 'Зона ниже', group = 'Вид')
+colUp     = input.color(color.new(#089981, 0),  'Линия: тренд вверх', group = 'Вид')
+colDn     = input.color(color.new(#e04a4a, 0),  'Линия: тренд вниз',  group = 'Вид')
+colFlat   = input.color(color.new(#f0b90b, 0),  'Линия: нет тренда',  group = 'Вид')
+colBand   = input.color(color.gray,             'Канал',              group = 'Вид')
 showBands = input.bool(true, 'Показывать канал', group = 'Вид')
 
 // --- линия KAMA ---
@@ -53,13 +60,20 @@ if pend >= confBars
 if pend <= -confBars
     trend := -1
 
+flipUp   = trend == 1  and trend[1] != 1
+flipDown = trend == -1 and trend[1] != -1
+
 // --- отбой: касание линии (с запасом) при подтверждённом тренде ---
 touchUp = trend == 1  and low  < line_ + bufMult * atrV and close > line_
 touchDn = trend == -1 and high > line_ - bufMult * atrV and close < line_
 
+lineColor = trend == 1 ? colUp : trend == -1 ? colDn : colFlat
+
 // --- вывод ---
-plot(showBands ? upBand : na, 'Верх канала', color = colUp, linewidth = 1, style = plot.style_linebr)
-plot(showBands ? dnBand : na, 'Низ канала',  color = colDn, linewidth = 1, style = plot.style_linebr)
-plot(line_,                   'Тренд линия', color = colLine, linewidth = 2)
-plotshape(touchUp, 'Отбой вверх', shape.circle, location.belowbar, color.new(#089981, 0), size = size.tiny)
-plotshape(touchDn, 'Отбой вниз',  shape.circle, location.abovebar, color.new(#e04a4a, 0), size = size.tiny)
+plot(showBands ? upBand : na, 'Верх канала', color = color.new(colBand, 70), linewidth = 1, style = plot.style_linebr)
+plot(showBands ? dnBand : na, 'Низ канала',  color = color.new(colBand, 70), linewidth = 1, style = plot.style_linebr)
+plot(line_,                   'Тренд линия', color = lineColor, linewidth = 2)
+plotshape(flipUp,   'Смена тренда вверх', shape.triangleup,   location.belowbar, colUp, size = size.small)
+plotshape(flipDown, 'Смена тренда вниз',  shape.triangledown, location.abovebar, colDn, size = size.small)
+plotshape(touchUp, 'Отбой вверх', shape.circle,  location.belowbar, color.new(#089981, 40), size = size.tiny)
+plotshape(touchDn, 'Отбой вниз',  shape.circle,  location.abovebar, color.new(#e04a4a, 40), size = size.tiny)
